@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مجسم الشقة</title>
+<style>
+  :root{--bg:#f4f2ee;--fg:#1d1d1b;--muted:#6b6b66;--panel:rgba(255,255,255,.92);--line:#d9d6cf;--accent:#1f4e79}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--panel:rgba(32,32,31,.92);--line:#3a3a38;--accent:#7fb2e6}}
+  :root[data-theme="dark"]{--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--panel:rgba(32,32,31,.92);--line:#3a3a38;--accent:#7fb2e6}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden}
+  model-viewer{position:fixed;inset:0;width:100%;height:100%;background:var(--bg);--poster-color:transparent}
+  .panel{position:fixed;top:12px;right:12px;left:12px;max-width:520px;margin-inline-start:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 14px;backdrop-filter:blur(6px);z-index:2}
+  h1{font-size:16px;margin:0 0 2px}
+  .sub{font-size:12px;color:var(--muted);margin:0}
+  .bar{position:fixed;bottom:14px;left:12px;right:12px;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;z-index:2}
+  button{font:inherit;font-size:14px;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+  button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .hot{display:block;width:auto;padding:3px 8px;border-radius:6px;background:var(--panel);border:1px solid var(--line);font-size:12px;font-weight:600;white-space:nowrap;transform:translate(50%,-50%)}
+  .hot[data-visibility-state~="hidden"]{opacity:.25}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>مجسم الشقة – مرحلة المباني</h1>
+  <p class="sub">إصبع واحد يلفّ · إصبعين يقرّبوا ويحرّكوا · الحوائط 3.00 م بدون سقف</p>
+</div>
+
+<model-viewer id="mv"
+  alt="مجسم الشقة"
+  camera-controls touch-action="none" interaction-prompt="none"
+  auto-rotate auto-rotate-delay="2500" rotation-per-second="12deg"
+  camera-orbit="35deg 58deg 24m" min-camera-orbit="auto 0deg 6m" max-camera-orbit="auto 88deg 60m"
+  field-of-view="35deg" exposure="0.75" shadow-intensity="0.8" shadow-softness="0.8" environment-image="neutral"
+  ar ar-modes="scene-viewer webxr quick-look" ar-scale="auto">
+  <button slot="ar-button" id="arBtn">عرض في الأوضة (AR)</button>
+    <div class="hot" slot="hotspot-0" data-position="1.75m 0.05m -2.35m" data-normal="0m 1m 0m">الصالة</div>
+  <div class="hot" slot="hotspot-1" data-position="5.38m 0.05m -2.52m" data-normal="0m 1m 0m">غرفة الأطفال</div>
+  <div class="hot" slot="hotspot-2" data-position="-3.30m 0.05m -3.08m" data-normal="0m 1m 0m">الغرفة الثانية</div>
+  <div class="hot" slot="hotspot-3" data-position="-3.90m 0.05m -0.28m" data-normal="0m 1m 0m">المطبخ</div>
+  <div class="hot" slot="hotspot-4" data-position="-0.68m 0.05m -2.50m" data-normal="0m 1m 0m">الحمام</div>
+  <div class="hot" slot="hotspot-5" data-position="-0.68m 0.05m -4.17m" data-normal="0m 1m 0m">منور</div>
+  <div class="hot" slot="hotspot-6" data-position="-1.23m 0.05m -0.68m" data-normal="0m 1m 0m">الطرقة</div>
+  <div class="hot" slot="hotspot-7" data-position="-1.95m 0.05m 0.72m" data-normal="0m 1m 0m">تجويف الغسالة</div>
+  <div class="hot" slot="hotspot-8" data-position="7.80m 0.05m -2.15m" data-normal="0m 1m 0m">البلكونة</div>
+</model-viewer>
+
+<div class="bar">
+  <button id="bIso" class="on">منظور مائل</button>
+  <button id="bTop">من فوق</button>
+  <button id="bFront">من قدام</button>
+  <button id="bSpin" class="on">دوران تلقائي</button>
+</div>
+
+<script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
+<script>
+  const mv = document.getElementById('mv');
+  const ;
+    mv.src = 'model.glb';
+  const views = {bIso: '35deg 58deg 24m', bTop: '0deg 0.1deg 22m', bFront: '0deg 80deg 22m'};
+  for (const id in views) document.getElementById(id).onclick = e => {
+    mv.cameraOrbit = views[id]; mv.cameraTarget = 'auto auto auto';
+    for (const k in views) document.getElementById(k).classList.toggle('on', k === id);
+  };
+  document.getElementById('bSpin').onclick = e => { mv.autoRotate = !mv.autoRotate; e.target.classList.toggle('on', mv.autoRotate); };
+  mv.addEventListener('camera-change', e => { if (e.detail.source === 'user-interaction') for (const k in views) document.getElementById(k).classList.remove('on'); });
+</script>
+</body>
+</html>
