@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>html,body{margin:0;background:#f4f2ee;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+</head><body><canvas id="c"></canvas>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const W = 1000, H = 700;
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, preserveDrawingBuffer:true});
+renderer.setSize(W, H, false); renderer.setPixelRatio(1); renderer.localClippingEnabled = true;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0xf4f2ee);
+const camera = new THREE.PerspectiveCamera(32, W/H, 0.1, 200);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x9a9a90, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 1.0); sun.position.set(8, 14, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048); const s = 12; Object.assign(sun.shadow.camera, {left:-s, right:s, top:s, bottom:-s, near:1, far:50}); scene.add(sun);
+const clip = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1.20);
+const root = new THREE.Group(); root.rotation.x = -Math.PI/2; scene.add(root);
+const center = new THREE.Vector3(1.45, 0.2, -1.7);
+const COL = {wall_ext:0xcfcbc2, wall_int:0xe4e1d8, column:0x5a5a58, parapet:0xc9bda6, floor:0xf1ede4, floor_wet:0xc9dceb, floor_balcony:0xd8d3c8, slab:0xb4b4b0};
+const mats = [];
+const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 64), new THREE.ShadowMaterial({opacity:0.18})); ground.rotation.x = -Math.PI/2; ground.position.y = -0.125; ground.receiveShadow = true; scene.add(ground);
+await new Promise(res => new GLTFLoader().load('apartment_3d.glb', g => {
+  g.scene.traverse(o => { if (o.isMesh) { if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); let n=o.name, p=o; while (p && !(n in COL)) { p=p.parent; n=p?p.name:''; }
+    o.material = new THREE.MeshStandardMaterial({color: COL[n] ?? 0xdddddd, roughness:.95, metalness:0}); mats.push(o.material); o.castShadow = true; o.receiveShadow = true;
+    const e = new THREE.LineSegments(new THREE.EdgesGeometry(o.geometry, 30), new THREE.LineBasicMaterial({color:0x55534e, transparent:true, opacity:.5})); mats.push(e.material); o.add(e); } });
+  root.add(g.scene); res();
+}));
+window.setFrame = (deg, cut, elev) => {
+  for (const m of mats) m.clippingPlanes = cut ? [clip] : [];
+  const r = 23, a = THREE.MathUtils.degToRad(deg), e = THREE.MathUtils.degToRad(elev ?? 40);
+  camera.position.set(center.x + r*Math.cos(e)*Math.sin(a), center.y + r*Math.sin(e), center.z + r*Math.cos(e)*Math.cos(a));
+  camera.lookAt(center); renderer.render(scene, camera); return canvas.toDataURL('image/jpeg', 0.82);
+};
+window.ready = true;
+</script></body></html>

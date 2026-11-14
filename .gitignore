@@ -1,0 +1,6 @@
+out/
+viewer/node_modules/
+viewer/frames/
+viewer/apartment_3d.glb
+viewer/package*.json
+__pycache__/
