@@ -26,7 +26,7 @@
   <p class="sub">إصبع واحد يلفّ · إصبعين يقرّبوا ويحرّكوا · الحوائط 3.00 م بدون سقف</p>
 </div>
 
-<model-viewer id="mv"
+<model-viewer id="mv" src="model.glb"
   alt="مجسم الشقة"
   camera-controls touch-action="none" interaction-prompt="none"
   auto-rotate auto-rotate-delay="2500" rotation-per-second="12deg"
@@ -55,8 +55,6 @@
 <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 <script>
   const mv = document.getElementById('mv');
-  const ;
-    mv.src = 'model.glb';
   const views = {bIso: '35deg 58deg 24m', bTop: '0deg 0.1deg 22m', bFront: '0deg 80deg 22m'};
   for (const id in views) document.getElementById(id).onclick = e => {
     mv.cameraOrbit = views[id]; mv.cameraTarget = 'auto auto auto';
