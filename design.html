@@ -84,6 +84,7 @@
     <button class="sm" id="bFit">⤢</button>
     <button class="sm" id="bProg">التنفيذ</button>
     <button class="sm" id="bQty">الكميات</button>
+    <button class="sm" id="bPull">⬇ آخر نسخة</button>
     <button class="sm" id="bSave">حفظ / تصدير</button>
   </header>
   <div id="side" style="display:contents"><div class="tabs" id="tabs"></div><div id="lib"></div></div>
@@ -113,6 +114,7 @@ const ROOM_ORDER = ["living","kids","room2","kitchen","bath","corr","niche","bal
 
 // مكتبة العناصر: w = البعد على X, d = البعد على Y (بالمتر), h = الارتفاع, cat = التبويب
 const LIB = [
+ {id:"custom",cat:"عام",name:"عنصر مخصص",w:1.0,d:1.0,h:0.5,c:"#bbb"},
  // غرف النوم
  {id:"bed160",cat:"نوم",name:"سرير 160",w:1.60,d:2.00,h:0.50,c:"#8ea7c9"},
  {id:"bed180",cat:"نوم",name:"سرير 180",w:1.80,d:2.00,h:0.50,c:"#8ea7c9"},
@@ -275,8 +277,12 @@ function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){
 
 // ===================== أنماط البلاط (رسم على كانفاس) =====================
 const patCache = {};
-function floorDef(f, custom){ const F=Object.assign({}, f); if (f.id==="custom" && custom){ F.c=custom.c||F.c; F.g=custom.g||F.g; F.tile=custom.tile||F.tile; F.tile2=custom.tile2||null; } return F; }
-function tilePattern(F, pxPerM, seedKey){ const tw=F.tile||0.6, th=F.tile2||F.tile||0.6; const key=`${F.id}|${F.c}|${F.g}|${tw}|${th}|${Math.round(pxPerM)}`; if (patCache[key]) return patCache[key];
+function floorDef(f, custom){ const F=Object.assign({}, f); if (f.id==="custom" && custom){ F.c=custom.c||F.c; F.g=custom.g||F.g; F.tile=custom.tile||F.tile; F.tile2=custom.tile2||null; if (custom.img){ F.img=custom.img; F.kind="img"; } } return F; }
+const imgCache = {};
+function getImg(src){ if (imgCache[src]) return imgCache[src]; const im=new Image(); im.onload=()=>{ imgCache[src]=im; for (const k in patCache) if (k.includes("img:")) delete patCache[k]; draw(); }; im.src=src; imgCache[src]=im; return im; }
+function avgColor(im){ try{ const c=document.createElement('canvas'); c.width=c.height=8; const g=c.getContext('2d'); g.drawImage(im,0,0,8,8); const d=g.getImageData(0,0,8,8).data; let r=0,gg=0,b=0; for (let i=0;i<d.length;i+=4){ r+=d[i]; gg+=d[i+1]; b+=d[i+2]; } const n=d.length/4; return `rgb(${r/n|0},${gg/n|0},${b/n|0})`; }catch(e){ return "#cccccc"; } }
+function tilePattern(F, pxPerM, seedKey){ const tw=F.tile||0.6, th=F.tile2||F.tile||0.6; const key=`${F.id}|${F.c}|${F.g}|${tw}|${th}|${Math.round(pxPerM)}|${F.img?("img:"+F.img.slice(0,40)):""}`; if (patCache[key]) return patCache[key];
+  if (F.img){ const im=getImg(F.img); if (!im.complete || !im.naturalWidth) return F.c; const W=Math.max(2,Math.round(tw*pxPerM)), H=Math.max(2,Math.round(th*pxPerM)); const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d'); g.drawImage(im,0,0,W,H); const gap=Math.max(1,pxPerM*0.004); g.fillStyle=F.g||"#bbb"; g.fillRect(0,0,W,gap); g.fillRect(0,0,gap,H); const p=ctx.createPattern(c,'repeat'); patCache[key]=p; return p; }
   const reps = F.kind==="wood"||F.kind==="brick" ? 2 : 1; // offset rows need 2 columns
   const W=Math.max(2,Math.round(tw*pxPerM*reps)), H=Math.max(2,Math.round(th*pxPerM*2)); const c=document.createElement('canvas'); c.width=W; c.height=H; const g=c.getContext('2d');
   const base=F.c, grout=F.g||"#bbb"; g.fillStyle=grout; g.fillRect(0,0,W,H);
@@ -350,6 +356,7 @@ function drawPoly2d(it, on){ const W=polyWorld(it); ctx.save(); ctx.beginPath();
   const cx=W.reduce((a,p)=>a+p[0],0)/W.length, cy=W.reduce((a,p)=>a+p[1],0)/W.length; ctx.fillStyle="#000c"; ctx.font="10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText((it.name||"شكل")+(it.plane==="ceil"?" (سقف)":it.plane==="wall"?" (قائم)":""), X(cx), Y(cy)); ctx.restore(); }
 function drawItem(it, on){
   if (it.t==="poly") return drawPoly2d(it, on);
+  if (it.img){ const L = LIB.find(l=>l.id===it.t) || {w:1,d:1,h:0.5,name:"عنصر",c:"#bbb"}; const w=it.w??L.w, d=it.d??L.d; const im=getImg(it.img); ctx.save(); ctx.translate(X(it.x),Y(it.y)); ctx.rotate(-(it.r||0)*Math.PI/180); const pw=w*view.s, pd=d*view.s; if (im.complete && im.naturalWidth) ctx.drawImage(im,-pw/2,-pd/2,pw,pd); else { ctx.fillStyle=it.c||L.c; ctx.fillRect(-pw/2,-pd/2,pw,pd); } ctx.strokeStyle=on?"#1f4e79":"#0008"; ctx.lineWidth=on?3:1; ctx.strokeRect(-pw/2,-pd/2,pw,pd); ctx.rotate((it.r||0)*Math.PI/180); ctx.fillStyle="#000c"; ctx.font="9px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(`${it.name||L.name} ${w.toFixed(2)}×${d.toFixed(2)}`, 0, pd/2-7); ctx.restore(); return; }
   const L = LIB.find(l=>l.id===it.t) || LIB[0]; const w = it.w ?? L.w, d = it.d ?? L.d; const rot = it.r||0;
   ctx.save(); ctx.translate(X(it.x), Y(it.y)); ctx.rotate(-rot*Math.PI/180);
   const pw = w*view.s, pd = d*view.s;
@@ -371,7 +378,7 @@ addEventListener('resize', fit);
 // ===================== التفاعل =====================
 const ptrs = new Map(); let drag = null, pinch = null, moved = false, downAt = 0;
 function hitVertex(x,y){ if (!sel || sel.t!=="poly") return null; const W=polyWorld(sel); const tol=Math.max(0.12, 10/view.s); for (let i=0;i<W.length;i++){ if (Math.hypot(W[i][0]-x,W[i][1]-y)<tol) return i; } return null; }
-function hit(x, y){ const arr=visibleItems(); for (let i=arr.length-1;i>=0;i--){ const it=arr[i]; if (it.t==="poly"){ if (pointInPoly(x,y,polyWorld(it))) return it; continue; } const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
+function hit(x, y){ const arr=visibleItems(); for (let i=arr.length-1;i>=0;i--){ const it=arr[i]; if (it.t==="poly"){ if (pointInPoly(x,y,polyWorld(it))) return it; continue; } const L=LIB.find(l=>l.id===it.t)||LIB[0]; const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
 function roomAt(x,y){ for (const k of ROOM_ORDER){ const [x1,y1,x2,y2]=GEO.ROOMS[k].box; if (x>=x1&&x<=x2&&y>=y1&&y<=y2) return k; } return null; }
 const snap = v => Math.round(v*20)/20;
 stage.addEventListener('pointerdown', e => { if (e.target!==cv) return; cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX,y:e.clientY}); moved=false; downAt=Date.now();
@@ -444,7 +451,7 @@ function openShapeSheet(it){
 const selBar = document.getElementById('sel');
 function showSel(){ if (!sel){ selBar.classList.remove('on'); return; }
   if (sel.t==="poly"){ document.getElementById('selName').textContent = `${sel.name||"شكل"} – ${polyArea(sel.pts).toFixed(2)} م² – ${sel.plane==="ceil"?"سقف":sel.plane==="wall"?"قائم":"أرضي"}`; document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); return; }
-  const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); }
+  const L=LIB.find(l=>l.id===sel.t)||LIB[0]; document.getElementById('selName').textContent = `${sel.name||L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); }
 document.getElementById('bRealItem').onclick=()=>{ if(sel){ sel.real=!sel.real; save(); showSel(); draw(); } };
 document.getElementById('bRot').onclick=()=>{ if(sel){ sel.r=((sel.r||0)+90)%360; save(); draw(); } };
 document.getElementById('bDel').onclick=()=>{ if(sel){ S.items=S.items.filter(i=>i!==sel); sel=null; save(); showSel(); draw(); } };
@@ -583,7 +590,7 @@ function wallFaceStyle(px,py,nx,ny,kind){ // returns {lo:{col,h}|null, hi:col}
   // الحائط المميز: حسب اتجاه الوجه (nx,ny) بالنسبة للغرفة: الوجه اللي اتجاهه الخارجي ناحية الغرفة يحدد موقعه
   const side = Math.abs(nx)>Math.abs(ny) ? (nx>0 ? "left" : "right") : (ny>0 ? "bottom" : "top"); // وجه حائط يشير لداخل الغرفة من جهة... (nx>0 ⇒ الحائط على يسار الغرفة)
   const paint = (f.accent && f.accent!=="none" && f.accent===side) ? f.accentColor : f.paint;
-  const wt = f.wallTileId && f.wallTileId!=="none" ? (FLOORS.find(x=>x.id===f.wallTileId)||{}).c || f.wallTile : f.wallTile;
+  let wt = f.wallTileId && f.wallTileId!=="none" ? (FLOORS.find(x=>x.id===f.wallTileId)||{}).c || f.wallTile : f.wallTile; if (f.wallImg){ const im=getImg(f.wallImg); if (im.complete && im.naturalWidth) wt=avgColor(im); }
   if (WET(k) && f.tileH>0) return {lo:{col:wt||"#cfdfe6", h:f.tileH}, hi:paint};
   if (!WET(k) && f.tileH>0) return {lo:{col:wt||"#cfdfe6", h:f.tileH}, hi:paint}; // وزرة عالية/تجليد في غرفة جافة
   return {lo:null, hi:paint};
@@ -630,7 +637,7 @@ function draw3d(){
   const items=[]; // {faces[], d}
   const H = cut3d ? 1.20 : 3.0;
   // floors
-  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=floorDef(FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0], S.finishes[k].custom); let col = k==="manwar" ? "#9a9a9a" : F.c; const unf = showReality && k!=="manwar" && (S.progress[k]||{}).floor<2; if (unf) col=CONC;
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=floorDef(FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0], S.finishes[k].custom); if (F.img){ const im=getImg(F.img); if (im.complete && im.naturalWidth) F.c=avgColor(im); } let col = k==="manwar" ? "#9a9a9a" : F.c; const unf = showReality && k!=="manwar" && (S.progress[k]||{}).floor<2; if (unf) col=CONC;
     const tw = (!unf && F.tile && F.tile>=0.3) ? F.tile : 1.0, th = (!unf && F.tile && F.tile>=0.3) ? (F.tile2||F.tile) : 1.0; let i=0;
     for (let x=x1; x<x2; x+=tw, i++){ let j=0; for (let y=y1; y<y2; y+=th, j++){ const fx=Math.min(x+tw,x2), fy=Math.min(y+th,y2); const cc = (F.tile && !unf) ? shade(col, ((i+j)%2)?0.97:1.0) : col; const fs=boxFaces(x,y,fx,fy,-0.1,0,cc); items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))-0.001}); } } }
   // walls
@@ -642,7 +649,7 @@ function draw3d(){
   for (const it of visibleItems()){ if (it.t==="poly") continue; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ // point marker: small post
       const fs=boxFaces(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); continue; }
     const zz0 = L.ceil ? 2.95 : z0, zz1 = L.ceil ? 3.0 : z0 + Math.max(h,0.02); if (cut3d && zz0>=H) continue;
-    const fs=boxFaces(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2,zz0,Math.min(zz1,cut3d?Math.max(H,zz0+0.02):zz1),L.c,-(it.r||0),it.x,it.y); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); }
+    const icol = it.c || (it.img && imgCache[it.img] && imgCache[it.img].naturalWidth ? avgColor(imgCache[it.img]) : L.c); const fs=boxFaces(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2,zz0,Math.min(zz1,cut3d?Math.max(H,zz0+0.02):zz1),icol,-(it.r||0),it.x,it.y); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); }
   // ground shadow plane
   items.sort((a,b)=>b.d-a.d);
   for (const it of items) for (const f of it.faces.sort((a,b)=>b.d-a.d)){ ctx.beginPath(); ctx.moveTo(f.pts[0].sx,f.pts[0].sy); for (let i=1;i<f.pts.length;i++) ctx.lineTo(f.pts[i].sx,f.pts[i].sy); ctx.closePath(); ctx.fillStyle=f.col; ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=0.6; ctx.stroke(); }
@@ -687,14 +694,14 @@ function drawWalk(){
   const g=ctx.createLinearGradient(0,0,0,Hh); g.addColorStop(0,"#cfdcea"); g.addColorStop(0.5,"#e8eef3"); g.addColorStop(0.5,"#b9b3a6"); g.addColorStop(1,"#a39d90"); ctx.fillStyle=g; ctx.fillRect(0,0,W,Hh);
   const faces=[];
   const dark=false;
-  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=floorDef(FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0], S.finishes[k].custom); let col = k==="manwar"?"#9a9a9a":F.c; let pc = S.finishes[k].ceil||"#efece6"; let unf=false; if (showReality && k!=="manwar"){ const pr=S.progress[k]||{}; if (pr.floor<2){ col=CONC; unf=true; } if (pr.plaster<2) pc="#9d9890"; }
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=floorDef(FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0], S.finishes[k].custom); if (F.img){ const im=getImg(F.img); if (im.complete && im.naturalWidth) F.c=avgColor(im); } let col = k==="manwar"?"#9a9a9a":F.c; let pc = S.finishes[k].ceil||"#efece6"; let unf=false; if (showReality && k!=="manwar"){ const pr=S.progress[k]||{}; if (pr.floor<2){ col=CONC; unf=true; } if (pr.plaster<2) pc="#9d9890"; }
     const tw = (!unf && F.tile && F.tile>=0.3) ? F.tile : 1.0, th = (!unf && F.tile && F.tile>=0.3) ? (F.tile2||F.tile) : 1.0; let i=0;
     for (let x=x1; x<x2; x+=tw, i++){ let j=0; for (let y=y1; y<y2; y+=th, j++){ const fx=Math.min(x+tw,x2), fy=Math.min(y+th,y2); const cc=(F.tile && !unf)? shade(col, ((i+j)%2)?0.96:1.0):col; faces.push(...facesOfBox(x,y,fx,fy,-0.1,0,cc)); } }
     for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); if (k!=="manwar"&&k!=="balcony") faces.push(...facesOfBox(x,y,fx,fy,3.0,3.08,pc)); } }
   for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; const k=roomAt((x1+x2)/2,(y1+y2)/2); const base = kind==="E"?"#d9d4ca":kind==="I"?"#e6e2d8":kind==="L"?"#bfd3e6":kind==="P"?"#cbbfa6":"#6a6a66"; faces.push(...facesOfBox(x1,y1,x2,y2,z0,z1,base,0,0,0,kind)); }
   for (const it of visibleItems()){ if (it.t!=="poly") continue; for (const f of prismFaces3(it)){ const nn=newell(f); const c0=f.reduce((s,p)=>[s[0]+p[0]/f.length,s[1]+p[1]/f.length,s[2]+p[2]/f.length],[0,0,0]); const d=[c0[0]-P.x,c0[1]-P.y,c0[2]-P.z]; if (nn[0]*d[0]+nn[1]*d[1]+nn[2]*d[2] >= 0) continue; const dist=Math.hypot(...d); const shadeF = Math.abs(nn[2])>Math.hypot(nn[0],nn[1]) ? 1.0 : (Math.abs(nn[0])>Math.abs(nn[1])?0.88:0.76); faces.push({pts:f, col:shade(it.c, shadeF*Math.max(0.72,1-dist/30)), dist}); } }
   for (const it of visibleItems()){ if (it.t==="poly") continue; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
-    faces.push(...facesOfBox(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2, L.ceil?2.95:z0, L.ceil?3.0:z0+Math.max(h,0.02), L.c, -(it.r||0), it.x, it.y)); }
+    const icol = it.c || (it.img && imgCache[it.img] && imgCache[it.img].naturalWidth ? avgColor(imgCache[it.img]) : L.c); faces.push(...facesOfBox(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2, L.ceil?2.95:z0, L.ceil?3.0:z0+Math.max(h,0.02), icol, -(it.r||0), it.x, it.y)); }
   // wall paint: tint interior wall faces by room paint is complex; skip. Sort & draw
   faces.sort((a,b)=>b.dist-a.dist);
   for (const f of faces){ const cp=clipNear(f.pts.map(p=>camT(...p))); if (cp.length<3) continue; ctx.beginPath(); let first=true; for (const [xc,dep,up] of cp){ const sx=W/2+xc/dep*focal, sy=Hh/2-up/dep*focal; if (first){ctx.moveTo(sx,sy); first=false;} else ctx.lineTo(sx,sy); } ctx.closePath(); ctx.fillStyle=f.col; ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=0.5; ctx.stroke(); }
@@ -735,6 +742,7 @@ const up3 = e => { if (!mode3d) return; e.stopImmediatePropagation(); ptrs.delet
 stage.addEventListener('pointerup', up3, true); stage.addEventListener('pointercancel', up3, true);
 stage.addEventListener('wheel', e => { if (!mode3d) return; e.stopImmediatePropagation(); e.preventDefault(); const k=e.deltaY<0?1.1:1/1.1; const r=cv.getBoundingClientRect(); const px=e.clientX-r.left, py=e.clientY-r.top; cam.ox = px-(px-cam.ox)*k; cam.oy = py-(py-cam.oy)*k; cam.s*=k; draw(); }, {passive:false, capture:true});
 
+document.getElementById('bPull').onclick=async()=>{ try{ const r=await fetch('design.json?ts='+Date.now(),{cache:'no-store'}); if(!r.ok) throw 0; const d=await r.json(); if (!confirm(`تحميل نسخة ${d.meta?.version||""} (${d.meta?.date||""}) من الريبو؟ هتستبدل اللي على جهازك.`)) return; S=Object.assign(S,d); save(); location.reload(); }catch(e){ document.getElementById('hint').textContent="مفيش نسخة design.json على الريبو لسه"; } };
 document.getElementById('bFit').onclick=()=>fit();
 fit(); requestAnimationFrame(()=>fit()); addEventListener('load', ()=>fit());
 </script>
