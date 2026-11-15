@@ -6,6 +6,8 @@ mkdir -p out
 python3 src/render.py
 python3 src/dxf_export.py
 python3 src/build3d.py
+python3 src/measurements.py
+for e in xlsx csv json md; do cp "out/مقاسات_الشقة.$e" "مقاسات_الشقة.$e"; done
 cp out/floor_plan.png plan.png
 cp out/floor_plan.pdf plan.pdf
 cp out/floor_plan.svg plan.svg
