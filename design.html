@@ -29,6 +29,7 @@
   .item.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
   .item small{color:var(--muted);font-size:10px}
   .item i{display:block;width:28px;height:18px;border-radius:3px;border:1px solid #0003}
+  #drawbar{order:4}
   #sel{display:none;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
   #sel.on{display:flex}
   #sel .name{flex:1;font-size:13px;font-weight:600}
@@ -87,6 +88,7 @@
     <div id="sheet"></div>
     <div id="pad"><button data-k="f">▲<small>أمام</small></button><div class="mid"><button data-k="l">◀<small>شمال</small></button><button data-k="b">▼<small>خلف</small></button><button data-k="r">▶<small>يمين</small></button></div></div><div id="walkHelp">أمام/خلف للمشي · شمال/يمين للّف · اسحب على الشاشة للنظر</div>
   </div>
+  <div id="drawbar" style="display:none;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line);align-items:center"><span style="flex:1;font-size:13px" id="drawInfo">0 نقاط</span><button class="sm" id="bUndoPt">تراجع نقطة</button><button class="sm on" id="bFinish">إنهاء الشكل</button><button class="sm" id="bCancelDraw">إلغاء</button></div>
   <div id="sel">
     <span class="name" id="selName"></span>
     <button class="sm" id="bRot">↻ لف 90°</button>
@@ -187,7 +189,33 @@ const LIB = [
  {id:"plant",cat:"عام",name:"نباتة",w:0.40,d:0.40,h:1.20,c:"#6aa36a"},
  {id:"rug",cat:"عام",name:"سجادة 2×3",w:2.00,d:3.00,h:0.01,c:"#b56b6b"},
 ];
-const CATS = ["نوم","صالة","مطبخ","حمام","أجهزة","كهرباء","سباكة","عام"];
+const CATS = ["أشكال","نوم","صالة","مطبخ","حمام","أجهزة","كهرباء","سباكة","عام"];
+
+
+// ---- قوالب الأشكال (مضلعات) : pts بالمتر حول (0,0) · plane: floor | ceil | wall ----
+function ringRect(w,d,t){ return [[-w/2,-d/2],[w/2,-d/2],[w/2,d/2],[-w/2,d/2],[-w/2,-d/2+0.0001],[-w/2+t,-d/2+t],[-w/2+t,d/2-t],[w/2-t,d/2-t],[w/2-t,-d/2+t],[-w/2+t,-d/2+t]]; } // إطار (حلقة) بنقطة وصل
+function ellipse(w,d,n=24){ const p=[]; for (let i=0;i<n;i++){ const a=i/n*2*Math.PI; p.push([w/2*Math.cos(a), d/2*Math.sin(a)]); } return p; }
+function archPts(w,h,t){ // قوس قائم (في مستوى XZ): x أفقي، z رأسي — إطار بسمك t
+  const o=[], n=14; o.push([-w/2,0]); o.push([-w/2,h-w/2]); for (let i=0;i<=n;i++){ const a=Math.PI - i/n*Math.PI; o.push([w/2*Math.cos(a), h-w/2 + w/2*Math.sin(a)]); } o.push([w/2,0]);
+  const r=w/2-t; o.push([w/2-t,0]); o.push([w/2-t,h-w/2]); for (let i=0;i<=n;i++){ const a=i/n*Math.PI; o.push([r*Math.cos(a), h-w/2 + r*Math.sin(a)]); } o.push([-w/2+t,h-w/2]); o.push([-w/2+t,0]); return o; }
+const SHAPES = [
+ {id:"draw",name:"✏️ رسم شكل حر",desc:"اضغط نقاط ثم «إنهاء»"},
+ {id:"gyp_rect",name:"بيت نور مستطيل",plane:"ceil",pts:ringRect(2.4,1.6,0.35),h:0.12,c:"#f3f1ec",desc:"جبس – سمك 12 سم"},
+ {id:"gyp_oval",name:"بيت نور بيضاوي",plane:"ceil",pts:ellipse(2.2,1.5),h:0.12,c:"#f3f1ec",desc:"جبس"},
+ {id:"gyp_step",name:"درجة سقف جبس",plane:"ceil",pts:ringRect(3.2,2.6,0.5),h:0.15,c:"#f3f1ec",desc:"إطار حول الغرفة"},
+ {id:"gyp_strip",name:"كورنيش/شريط ليد",plane:"ceil",pts:[[-1.5,-0.12],[1.5,-0.12],[1.5,0.12],[-1.5,0.12]],h:0.08,c:"#f6e7b0",desc:"3.00 م"},
+ {id:"arch",name:"قوس ديكور",plane:"wall",pts:archPts(1.2,2.3,0.12),h:0.12,c:"#e9e4da",desc:"1.20 × 2.30 – سمك 12"},
+ {id:"tvwall",name:"وحدة تلفزيون L",plane:"floor",pts:[[-1.2,-0.2],[1.2,-0.2],[1.2,0.2],[-0.4,0.2],[-0.4,0.6],[-1.2,0.6]],z0:0,h:0.6,c:"#8f6a46",desc:"خشب"},
+ {id:"tvpanel",name:"تجليد حائط تلفزيون",plane:"wall",pts:[[-1.4,0],[1.4,0],[1.4,2.4],[-1.4,2.4]],h:0.05,c:"#c9b391",desc:"2.80 × 2.40"},
+ {id:"shelf",name:"رف حائط",plane:"wall",pts:[[-0.6,0],[0.6,0],[0.6,0.04],[-0.6,0.04]],h:0.25,c:"#a0784f",z0:1.5,desc:"1.20 – عمق 25"},
+ {id:"niche",name:"رف/كوة ديكور",plane:"wall",pts:ringRect(0.9,1.2,0.08),h:0.25,c:"#e9e4da",z0:0.9,desc:"إطار قائم"},
+ {id:"island",name:"جزيرة مطبخ",plane:"floor",pts:[[-0.8,-0.45],[0.8,-0.45],[0.8,0.45],[-0.8,0.45]],z0:0,h:0.9,c:"#d9b38c",desc:"1.60 × 0.90"},
+ {id:"barc",name:"رخامة بار",plane:"floor",pts:[[-0.65,-0.2],[0.65,-0.2],[0.65,0.2],[-0.65,0.2]],z0:1.5,h:0.04,c:"#777",desc:"1.30 × 0.40 على 1.50"},
+ {id:"lib",name:"مكتبة",plane:"floor",pts:[[-1.0,-0.2],[1.0,-0.2],[1.0,0.2],[-1.0,0.2]],z0:0,h:2.2,c:"#a0784f",desc:"2.00 × 0.40 × 2.20"},
+ {id:"partition",name:"بارتشن/فاصل",plane:"floor",pts:[[-0.9,-0.05],[0.9,-0.05],[0.9,0.05],[-0.9,0.05]],z0:0,h:2.2,c:"#cbd5e1",desc:"1.80 × 0.10 × 2.20"},
+ {id:"column_dec",name:"عمود ديكور",plane:"floor",pts:ellipse(0.3,0.3,16),z0:0,h:3.0,c:"#ddd7cc",desc:"Ø30"},
+ {id:"platform",name:"منصة/دكة",plane:"floor",pts:[[-1.0,-0.6],[1.0,-0.6],[1.0,0.6],[-1.0,0.6]],z0:0,h:0.4,c:"#c4a77d",desc:"2.00 × 1.20 × 0.40"},
+];
 
 // خامات الأرضيات
 const FLOORS = [
@@ -235,7 +263,7 @@ function fit(){ const r = stage.getBoundingClientRect(); dpr = Math.min(devicePi
   view.s = s; view.ox = r.width/2 - s*(xs[0]+xs[1])/2; view.oy = r.height/2 + s*(ys[0]+ys[1])/2; draw(); }
 const X = x => view.ox + x*view.s, Y = y => view.oy - y*view.s;
 const ix = px => (px - view.ox)/view.s, iy = py => (view.oy - py)/view.s;
-let sel = null, tool = null, cat = CATS[0], showPts = true;
+let sel = null, tool = null, cat = CATS[1], showPts = true, drawPts = [], vtx = null;
 function rect(b, fill, stroke, lw){ const [x1,y1,x2,y2]=b; ctx.beginPath(); ctx.rect(X(x1), Y(y2), (x2-x1)*view.s, (y2-y1)*view.s); if (fill){ctx.fillStyle=fill; ctx.fill();} if (stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw||1; ctx.stroke();} }
 function drawTiles(b, f){ if (!f.tile) return; const [x1,y1,x2,y2]=b; const tw=f.tile, th=f.tile2||f.tile; ctx.save(); ctx.beginPath(); ctx.rect(X(x1),Y(y2),(x2-x1)*view.s,(y2-y1)*view.s); ctx.clip(); ctx.strokeStyle="rgba(0,0,0,.12)"; ctx.lineWidth=1;
   for (let x=x1; x<x2; x+=tw){ ctx.beginPath(); ctx.moveTo(X(x),Y(y1)); ctx.lineTo(X(x),Y(y2)); ctx.stroke(); }
@@ -265,6 +293,8 @@ function draw(){
   for (const d of Object.values(GEO.DOORS)) { const [x1,y1,x2,y2]=d.box; ctx.beginPath(); if (x2-x1 > y2-y1) { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1),Y(y1+d.w)); ctx.arc(X(x1),Y(y1),d.w*view.s,-Math.PI/2,0); } else { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1+d.w),Y(y1)); ctx.arc(X(x1),Y(y1),d.w*view.s,0,-Math.PI/2,true);} ctx.stroke(); }
   // items
   for (const it of visibleItems()) drawItem(it, it===sel);
+  // الشكل قيد الرسم
+  if (drawPts.length){ ctx.save(); ctx.strokeStyle="#c05621"; ctx.lineWidth=2; ctx.setLineDash([6,4]); ctx.beginPath(); drawPts.forEach((p,i)=> i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]))); ctx.stroke(); ctx.setLineDash([]); for (const p of drawPts){ ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),5,0,Math.PI*2); ctx.fillStyle="#c05621"; ctx.fill(); } ctx.restore(); }
   // room labels
   ctx.textAlign="center"; ctx.textBaseline="middle";
   for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const cx=(x1+x2)/2, cy=(y1+y2)/2; const fs = Math.max(10, Math.min(16, view.s*0.22));
@@ -273,7 +303,12 @@ function draw(){
   // scale
   ctx.fillStyle = dark?"#ececea":"#1d1d1b"; ctx.fillRect(12, cv.height/dpr-18, view.s, 3); ctx.font="11px system-ui"; ctx.textAlign="left"; ctx.fillText("1 م", 12, cv.height/dpr-24);
 }
+function drawPoly2d(it, on){ const W=polyWorld(it); ctx.save(); ctx.beginPath(); W.forEach((p,i)=> i?ctx.lineTo(X(p[0]),Y(p[1])):ctx.moveTo(X(p[0]),Y(p[1]))); ctx.closePath();
+  ctx.fillStyle=it.c; ctx.globalAlpha = it.plane==="ceil" ? 0.55 : 0.9; ctx.fill(); ctx.globalAlpha=1; ctx.strokeStyle=on?"#1f4e79":"#0008"; ctx.lineWidth=on?3:1; if (it.plane==="ceil") ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+  if (on){ for (const p of W){ ctx.beginPath(); ctx.arc(X(p[0]),Y(p[1]),6,0,Math.PI*2); ctx.fillStyle="#fff"; ctx.fill(); ctx.strokeStyle="#1f4e79"; ctx.lineWidth=2; ctx.stroke(); } }
+  const cx=W.reduce((a,p)=>a+p[0],0)/W.length, cy=W.reduce((a,p)=>a+p[1],0)/W.length; ctx.fillStyle="#000c"; ctx.font="10px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText((it.name||"شكل")+(it.plane==="ceil"?" (سقف)":it.plane==="wall"?" (قائم)":""), X(cx), Y(cy)); ctx.restore(); }
 function drawItem(it, on){
+  if (it.t==="poly") return drawPoly2d(it, on);
   const L = LIB.find(l=>l.id===it.t) || LIB[0]; const w = it.w ?? L.w, d = it.d ?? L.d; const rot = it.r||0;
   ctx.save(); ctx.translate(X(it.x), Y(it.y)); ctx.rotate(-rot*Math.PI/180);
   const pw = w*view.s, pd = d*view.s;
@@ -294,12 +329,14 @@ addEventListener('resize', fit);
 
 // ===================== التفاعل =====================
 const ptrs = new Map(); let drag = null, pinch = null, moved = false, downAt = 0;
-function hit(x, y){ const arr=visibleItems(); for (let i=arr.length-1;i>=0;i--){ const it=arr[i]; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
+function hitVertex(x,y){ if (!sel || sel.t!=="poly") return null; const W=polyWorld(sel); const tol=Math.max(0.12, 10/view.s); for (let i=0;i<W.length;i++){ if (Math.hypot(W[i][0]-x,W[i][1]-y)<tol) return i; } return null; }
+function hit(x, y){ const arr=visibleItems(); for (let i=arr.length-1;i>=0;i--){ const it=arr[i]; if (it.t==="poly"){ if (pointInPoly(x,y,polyWorld(it))) return it; continue; } const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
 function roomAt(x,y){ for (const k of ROOM_ORDER){ const [x1,y1,x2,y2]=GEO.ROOMS[k].box; if (x>=x1&&x<=x2&&y>=y1&&y<=y2) return k; } return null; }
 const snap = v => Math.round(v*20)/20;
 stage.addEventListener('pointerdown', e => { if (e.target!==cv) return; cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX,y:e.clientY}); moved=false; downAt=Date.now();
   if (ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2, s:view.s, ox:view.ox, oy:view.oy}; drag=null; return; }
   const r = cv.getBoundingClientRect(); const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top);
+  const vi = hitVertex(x,y); if (vi!==null){ drag={vtx:vi, it:sel}; return; }
   const h = hit(x,y);
   if (h){ sel = h; drag = {it:h, dx:h.x-x, dy:h.y-y}; showSel(); draw(); }
   else drag = {pan:true, x0:e.clientX, y0:e.clientY, ox:view.ox, oy:view.oy};
@@ -309,13 +346,17 @@ stage.addEventListener('pointermove', e => { if (!ptrs.has(e.pointerId)) return;
     view.s = Math.min(400, Math.max(20, pinch.s*k)); const kk = view.s/pinch.s; view.ox = (cx-r.left) - ((pinch.cx-r.left)-pinch.ox)*kk + (cx-pinch.cx)*0; view.oy = (cy-r.top) - ((pinch.cy-r.top)-pinch.oy)*kk; moved=true; draw(); return; }
   if (!drag) return; const r = cv.getBoundingClientRect();
   if (drag.pan){ if (Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>4) moved=true; view.ox = drag.ox + (e.clientX-drag.x0); view.oy = drag.oy + (e.clientY-drag.y0); draw(); }
+  else if (drag.vtx!==undefined){ const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top); const it=drag.it; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; it.pts[drag.vtx]=[+(snap(dx*Math.cos(a)-dy*Math.sin(a))).toFixed(3), +(snap(dx*Math.sin(a)+dy*Math.cos(a))).toFixed(3)]; moved=true; draw(); }
   else { const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top); drag.it.x = snap(x+drag.dx); drag.it.y = snap(y+drag.dy); moved=true; draw(); }
 });
 function up(e){ ptrs.delete(e.pointerId); if (ptrs.size<2) pinch=null;
   if (drag && !drag.pan && moved) save();
+  if (drag && drag.vtx!==undefined){ drag=null; ptrs.delete(e.pointerId); return; }
   if (drag && drag.pan && !moved && Date.now()-downAt < 500){ // tap on empty space
     const r = cv.getBoundingClientRect(); const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top);
-    if (tool){ const L = LIB.find(l=>l.id===tool); S.items.push({id:Date.now().toString(36), t:tool, x:snap(x), y:snap(y), r:0, real: showReality||undefined}); sel = S.items[S.items.length-1]; save(); showSel(); draw(); }
+    if (tool==="shape:draw"){ drawPts.push([snap(x),snap(y)]); updDrawBar(); }
+    else if (tool && tool.startsWith("shape:")){ placeShape(tool.slice(6), x, y); }
+    else if (tool){ const L = LIB.find(l=>l.id===tool); S.items.push({id:Date.now().toString(36), t:tool, x:snap(x), y:snap(y), r:0, real: showReality||undefined}); sel = S.items[S.items.length-1]; save(); showSel(); draw(); }
     else { const k = roomAt(x,y); if (k && k!=="manwar") openRoom(k); else { sel=null; showSel(); draw(); } }
   }
   drag=null; }
@@ -326,18 +367,49 @@ stage.addEventListener('wheel', e => { e.preventDefault(); const r=cv.getBoundin
 const tabs = document.getElementById('tabs'), lib = document.getElementById('lib');
 function renderTabs(){ tabs.innerHTML=""; for (const c of CATS){ const b=document.createElement('button'); b.textContent=c; b.className = c===cat?"on":""; b.onclick=()=>{cat=c; tool=null; renderTabs(); renderLib();}; tabs.appendChild(b); }
   const b2=document.createElement('button'); b2.textContent = showPts ? "إخفاء النقط" : "إظهار النقط"; b2.onclick=()=>{showPts=!showPts; renderTabs(); draw();}; tabs.appendChild(b2); }
-function renderLib(){ lib.innerHTML=""; for (const L of LIB.filter(l=>l.cat===cat)){ const d=document.createElement('div'); d.className="item"+(tool===L.id?" on":""); d.innerHTML=`<i style="background:${L.c}"></i><span>${L.name}</span><small>${L.pt?"نقطة":(L.w.toFixed(2)+"×"+L.d.toFixed(2))}</small>`; d.onclick=()=>{ tool = tool===L.id ? null : L.id; renderLib(); document.getElementById('hint').textContent = tool ? `اضغط في المخطط مكان: ${L.name}` : "اختار عنصر من تحت ثم اضغط مكانه في المخطط"; }; lib.appendChild(d); } }
+function renderLib(){ lib.innerHTML="";
+  if (cat==="أشكال"){ for (const Sh of SHAPES){ const d=document.createElement('div'); d.className="item"+(tool==="shape:"+Sh.id?" on":""); d.innerHTML=`<i style="background:${Sh.c||'#eee'}"></i><span>${Sh.name}</span><small>${Sh.desc||""}</small>`; d.onclick=()=>{ tool = tool==="shape:"+Sh.id ? null : "shape:"+Sh.id; drawPts=[]; renderLib(); document.getElementById('hint').textContent = Sh.id==="draw" ? "اضغط نقاط الشكل على المخطط بالترتيب، ثم اضغط «إنهاء الشكل»" : `اضغط في المخطط مكان: ${Sh.name}`; updDrawBar(); }; lib.appendChild(d); } return; }
+  for (const L of LIB.filter(l=>l.cat===cat)){ const d=document.createElement('div'); d.className="item"+(tool===L.id?" on":""); d.innerHTML=`<i style="background:${L.c}"></i><span>${L.name}</span><small>${L.pt?"نقطة":(L.w.toFixed(2)+"×"+L.d.toFixed(2))}</small>`; d.onclick=()=>{ tool = tool===L.id ? null : L.id; renderLib(); document.getElementById('hint').textContent = tool ? `اضغط في المخطط مكان: ${L.name}` : "اختار عنصر من تحت ثم اضغط مكانه في المخطط"; }; lib.appendChild(d); } }
 renderTabs(); renderLib();
+
+
+// ===================== الأشكال الحرة =====================
+const drawbar=document.getElementById('drawbar');
+function updDrawBar(){ const on = tool==="shape:draw"; drawbar.style.display = on?"flex":"none"; document.getElementById('drawInfo').textContent = `${drawPts.length} نقاط`; draw(); }
+document.getElementById('bUndoPt').onclick=()=>{ drawPts.pop(); updDrawBar(); };
+document.getElementById('bCancelDraw').onclick=()=>{ drawPts=[]; tool=null; renderLib(); updDrawBar(); };
+document.getElementById('bFinish').onclick=()=>{ if (drawPts.length<3){ document.getElementById('hint').textContent="محتاج 3 نقاط على الأقل"; return; }
+  const cx=drawPts.reduce((a,p)=>a+p[0],0)/drawPts.length, cy=drawPts.reduce((a,p)=>a+p[1],0)/drawPts.length;
+  const it={id:Date.now().toString(36), t:"poly", name:"شكل", plane:"floor", pts:drawPts.map(p=>[+(p[0]-cx).toFixed(3),+(p[1]-cy).toFixed(3)]), x:+cx.toFixed(3), y:+cy.toFixed(3), r:0, z0:0, h:0.4, c:"#c9b391"};
+  S.items.push(it); sel=it; drawPts=[]; tool=null; renderLib(); updDrawBar(); save(); showSel(); openShapeSheet(it); };
+function placeShape(id,x,y){ const Sh=SHAPES.find(s=>s.id===id); const it={id:Date.now().toString(36), t:"poly", name:Sh.name, plane:Sh.plane, pts:Sh.pts.map(p=>[...p]), x:snap(x), y:snap(y), r:0, z0: Sh.plane==="ceil" ? +(3.0-Sh.h).toFixed(2) : (Sh.z0||0), h:Sh.h, c:Sh.c, real: showReality||undefined}; S.items.push(it); sel=it; save(); showSel(); draw(); }
+// نقاط الشكل في إحداثيات العالم
+function polyWorld(it){ const a=(it.r||0)*Math.PI/180; return it.pts.map(([px,py])=>[it.x+px*Math.cos(a)-py*Math.sin(a), it.y+px*Math.sin(a)+py*Math.cos(a)]); }
+function polyArea(pts){ let a=0; for (let i=0;i<pts.length;i++){ const [x1,y1]=pts[i], [x2,y2]=pts[(i+1)%pts.length]; a+=x1*y2-x2*y1; } return Math.abs(a)/2; }
+function pointInPoly(x,y,pts){ let inside=false; for (let i=0,j=pts.length-1;i<pts.length;j=i++){ const [xi,yi]=pts[i],[xj,yj]=pts[j]; if (((yi>y)!==(yj>y)) && (x < (xj-xi)*(y-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+function openShapeSheet(it){
+  openSheet(`<h2>الشكل: <input type="text" id="sname" value="${it.name||""}" style="width:160px"></h2>
+  <div class="row"><label>المستوى</label><select id="splane"><option value="floor" ${it.plane==="floor"?"selected":""}>على الأرض / حر</option><option value="ceil" ${it.plane==="ceil"?"selected":""}>على السقف (جبس)</option><option value="wall" ${it.plane==="wall"?"selected":""}>قائم على حائط</option></select></div>
+  <div class="row"><label>${it.plane==="wall"?"ارتفاع القاعدة عن الأرض (م)":"الارتفاع عن الأرض (م)"}</label><input type="number" step="0.05" id="sz0" value="${it.z0}"></div>
+  <div class="row"><label>${it.plane==="wall"?"السُمك/البروز (م)":"السُمك/الارتفاع (م)"}</label><input type="number" step="0.05" id="sh" value="${it.h}"></div>
+  <div class="row"><label>اللون</label><input type="color" id="sc" value="${it.c}"></div>
+  <div class="row"><label>المساحة</label><span>${polyArea(it.pts).toFixed(2)} م² · ${it.pts.length} رأس</span></div>
+  <p style="font-size:12px;color:var(--muted)">وانت محدد الشكل: اسحب أي رأس (الدوائر الصغيرة) لتغيير شكله · اسحب من الداخل لتحريكه · «لف 90°» من الشريط.</p>
+  <div class="row"><button class="on" id="sok">حفظ</button></div>`);
+  document.getElementById('splane').onchange=e=>{ const v=e.target.value; if (v==="ceil") document.getElementById('sz0').value=(3.0-(+document.getElementById('sh').value)).toFixed(2); if (v==="floor") document.getElementById('sz0').value=0; };
+  document.getElementById('sok').onclick=()=>{ it.name=document.getElementById('sname').value; it.plane=document.getElementById('splane').value; it.z0=+document.getElementById('sz0').value; it.h=+document.getElementById('sh').value; it.c=document.getElementById('sc').value; save(); closeSheet(); showSel(); draw(); }; }
 
 // ===================== شريط العنصر المحدد =====================
 const selBar = document.getElementById('sel');
-function showSel(){ if (!sel){ selBar.classList.remove('on'); return; } const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); }
+function showSel(){ if (!sel){ selBar.classList.remove('on'); return; }
+  if (sel.t==="poly"){ document.getElementById('selName').textContent = `${sel.name||"شكل"} – ${polyArea(sel.pts).toFixed(2)} م² – ${sel.plane==="ceil"?"سقف":sel.plane==="wall"?"قائم":"أرضي"}`; document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); return; }
+  const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); }
 document.getElementById('bRealItem').onclick=()=>{ if(sel){ sel.real=!sel.real; save(); showSel(); draw(); } };
 document.getElementById('bRot').onclick=()=>{ if(sel){ sel.r=((sel.r||0)+90)%360; save(); draw(); } };
 document.getElementById('bDel').onclick=()=>{ if(sel){ S.items=S.items.filter(i=>i!==sel); sel=null; save(); showSel(); draw(); } };
-document.getElementById('bDup').onclick=()=>{ if(sel){ const c=Object.assign({},sel,{id:Date.now().toString(36), x:sel.x+0.3, y:sel.y-0.3}); S.items.push(c); sel=c; save(); showSel(); draw(); } };
+document.getElementById('bDup').onclick=()=>{ if(sel){ const c=Object.assign({},sel,{id:Date.now().toString(36), x:sel.x+0.3, y:sel.y-0.3}); if (sel.pts) c.pts=sel.pts.map(p=>[...p]); S.items.push(c); sel=c; save(); showSel(); draw(); } };
 document.getElementById('bClose').onclick=()=>{ sel=null; tool=null; renderLib(); showSel(); draw(); };
-document.getElementById('bEdit').onclick=()=>{ if(!sel) return; const L=LIB.find(l=>l.id===sel.t);
+document.getElementById('bEdit').onclick=()=>{ if(!sel) return; if (sel.t==="poly") return openShapeSheet(sel); const L=LIB.find(l=>l.id===sel.t);
   openSheet(`<h2>مقاس: ${L.name}</h2>
   <div class="row"><label>العرض (م)</label><input type="number" step="0.05" id="ew" value="${(sel.w??L.w).toFixed(2)}"></div>
   <div class="row"><label>العمق (م)</label><input type="number" step="0.05" id="ed" value="${(sel.d??L.d).toFixed(2)}"></div>
@@ -400,10 +472,10 @@ function quantities(){
     const paintA=Math.max(0, walls-tileA); wallTile+=tileA; paint+=paintA; plaster+= (wet ? Math.max(0, P*(H-f.tileH)) : walls); ceil+=area; if (f.ceilType==="gypsum") gyps+=area; if (f.tileH===0) skirting+=P-op.pr;
     rows.push([r.name, area.toFixed(2), tileA.toFixed(1), paintA.toFixed(1), F.name]); }
   if (S.finishes.corr.barTile){ wallTile += 0.45*1.5 + 0.1*1.25; plaster -= 0.45*1.5; }
-  const cnt={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); cnt[L.name]=(cnt[L.name]||0)+1; }
-  const pts={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt) pts[L.pt]=(pts[L.pt]||0)+1; }
-  const elecApp = S.items.filter(it=>LIB.find(l=>l.id===it.t).elec).length, plumbApp = S.items.filter(it=>LIB.find(l=>l.id===it.t).plumb).length;
-  return {rows, floors, wallTile, paint, plaster, ceil, gyps, skirting, cnt, pts, elecApp, plumbApp}; }
+  const cnt={}; let gypArea=0, shapeList=[]; for (const it of S.items){ if (it.t==="poly"){ const ar=polyArea(it.pts); if (it.plane==="ceil") gypArea+=ar; shapeList.push(`${it.name||"شكل"} (${it.plane==="ceil"?"سقف":it.plane==="wall"?"قائم":"أرضي"}) ${ar.toFixed(2)} م²`); continue; } const L=LIB.find(l=>l.id===it.t); cnt[L.name]=(cnt[L.name]||0)+1; }
+  const pts={}; for (const it of S.items){ if (it.t==="poly") continue; const L=LIB.find(l=>l.id===it.t); if (L.pt) pts[L.pt]=(pts[L.pt]||0)+1; }
+  const elecApp = S.items.filter(it=>it.t!=="poly" && LIB.find(l=>l.id===it.t).elec).length, plumbApp = S.items.filter(it=>it.t!=="poly" && LIB.find(l=>l.id===it.t).plumb).length;
+  return {rows, floors, wallTile, paint, plaster, ceil, gyps, skirting, cnt, pts, elecApp, plumbApp, gypArea, shapeList}; }
 document.getElementById('bQty').onclick=()=>{ const q=quantities();
   const ptName={light:"نقط إضاءة",socket:"برايز",switch:"مفاتيح",ac:"نقط تكييف",data:"تلفزيون/نت",cold:"تغذية بارد",hot:"تغذية ساخن",drain:"صرف",floor:"بلاعات",gas:"غاز"};
   openSheet(`<h2>جدول الكميات (صافي – أضف 10% هالك) <span style="font-size:12px;color:var(--muted);font-weight:400">· التنفيذ ${progPct()}%</span></h2>
@@ -416,7 +488,8 @@ document.getElementById('bQty').onclick=()=>{ const q=quantities();
   <tr><td>محارة أسقف</td><td>${q.ceil.toFixed(1)} م²</td></tr>
   <tr><td>نقاشة حوائط</td><td>${q.paint.toFixed(1)} م²</td></tr>
   <tr><td>نقاشة أسقف</td><td>${(q.ceil-q.gyps).toFixed(1)} م²</td></tr>
-  <tr><td>جبس بورد</td><td>${q.gyps.toFixed(1)} م²</td></tr>
+  <tr><td>جبس بورد (أسقف كاملة)</td><td>${q.gyps.toFixed(1)} م²</td></tr>
+  <tr><td>أشكال جبس على السقف (بيوت نور/درجات)</td><td>${q.gypArea.toFixed(2)} م²</td></tr>
   <tr><td>وزرة (الغرف بدون سيراميك حوائط)</td><td>${q.skirting.toFixed(1)} م.ط</td></tr>
   <tr><td>أبواب</td><td>${Object.keys(GEO.DOORS).length} (1.00 / 0.90×3 / 0.80 / 0.70)</td></tr>
   <tr><td>شبابيك</td><td>${Object.keys(GEO.WINDOWS).length}</td></tr>
@@ -424,6 +497,7 @@ document.getElementById('bQty').onclick=()=>{ const q=quantities();
   <h2 style="margin-top:12px">الكهرباء والسباكة (النقط اللي حطيتها)</h2>
   <table>${Object.entries(q.pts).map(([p,n])=>`<tr><td>${ptName[p]||p}</td><td>${n}</td></tr>`).join("") || "<tr><td colspan=2>لم تُضف نقط بعد – من تبويب كهرباء/سباكة</td></tr>"}
   <tr><td>أجهزة تحتاج كهرباء</td><td>${q.elecApp}</td></tr><tr><td>عناصر تحتاج سباكة</td><td>${q.plumbApp}</td></tr></table>
+  ${q.shapeList.length ? `<h2 style="margin-top:12px">الأشكال الحرة</h2><table>${q.shapeList.map(x=>`<tr><td>${x}</td></tr>`).join("")}</table>` : ""}
   <h2 style="margin-top:12px">العناصر</h2>
   <table>${Object.entries(q.cnt).map(([n,c])=>`<tr><td>${n}</td><td>${c}</td></tr>`).join("") || "<tr><td colspan=2>لا يوجد</td></tr>"}</table>`); };
 
@@ -457,6 +531,21 @@ function wallFaceStyle(px,py,nx,ny,kind){ // returns {lo:{col,h}|null, hi:col}
   return {lo:null, hi:f.paint};
 }
 
+
+// مضلع → أوجه ثلاثية الأبعاد (منشور). plane floor/ceil: مضلع XY مبثوق في Z من z0 بارتفاع h. plane wall: مضلع XZ (x أفقي، z رأسي) مبثوق في Y بسمك h، يدور حول (x,y) بزاوية r.
+function prismFaces3(it){
+  const a=(it.r||0)*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a); const R=(px,py)=>[it.x+px*ca-py*sa, it.y+px*sa+py*ca];
+  const faces=[]; const n=it.pts.length;
+  if (it.plane==="wall"){ const t=it.h||0.1; const front=it.pts.map(([px,pz])=>{ const [x,y]=R(px,-t/2); return [x,y,it.z0+pz]; }); const back=it.pts.map(([px,pz])=>{ const [x,y]=R(px,t/2); return [x,y,it.z0+pz]; });
+    faces.push(front.slice().reverse(), back); for (let i=0;i<n;i++){ faces.push([front[i],front[(i+1)%n],back[(i+1)%n],back[i]]); } }
+  else { const z0=it.z0||0, z1=z0+(it.h||0.1); const bot=it.pts.map(([px,py])=>{ const [x,y]=R(px,py); return [x,y,z0]; }); const top=bot.map(p=>[p[0],p[1],z1]);
+    // ensure CCW for top
+    let ar=0; for (let i=0;i<n;i++){ const p=it.pts[i], q=it.pts[(i+1)%n]; ar+=p[0]*q[1]-q[0]*p[1]; } const ccw=ar>0;
+    faces.push(ccw?top:top.slice().reverse()); faces.push(ccw?bot.slice().reverse():bot);
+    for (let i=0;i<n;i++){ const q = ccw ? [bot[i],bot[(i+1)%n],top[(i+1)%n],top[i]] : [bot[(i+1)%n],bot[i],top[i],top[(i+1)%n]]; faces.push(q); } }
+  return faces; }
+function newell(pts){ let nx=0,ny=0,nz=0; for (let i=0;i<pts.length;i++){ const p=pts[i], q=pts[(i+1)%pts.length]; nx+=(p[1]-q[1])*(p[2]+q[2]); ny+=(p[2]-q[2])*(p[0]+q[0]); nz+=(p[0]-q[0])*(p[1]+q[1]); } return [nx,ny,nz]; }
+
 // ===================== عرض 3D (إسقاط محوري على Canvas – بدون WebGL) =====================
 let mode3d = false, cut3d = false, cam = {az: 35, el: 38, s: 60, ox: 0, oy: 0};
 function shade(hex, f){ const n=parseInt(hex.slice(1),16); const r=Math.min(255,Math.max(0,((n>>16)&255)*f)), g=Math.min(255,Math.max(0,((n>>8)&255)*f)), b=Math.min(255,Math.max(0,(n&255)*f)); return `rgb(${r|0},${g|0},${b|0})`; }
@@ -487,8 +576,11 @@ function draw3d(){
     for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); const fs=boxFaces(x,y,fx,fy,-0.1,0,col); items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))-0.001}); } }
   // walls
   for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; if (z0>=H) continue; const zz1=Math.min(z1,H); const col = kind==="E" ? (dark?"#cfcac2":"#d9d4ca") : kind==="I" ? "#e6e2d8" : kind==="L" ? "#bfd3e6" : kind==="P" ? "#cbbfa6" : "#6a6a66"; const fs=boxFaces(x1,y1,x2,y2,z0,zz1,col,0,0,0,kind); items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))}); }
+  // أشكال حرة
+  { const a=cam.az*Math.PI/180, e=cam.el*Math.PI/180; const v=[Math.sin(a)*Math.cos(e), Math.cos(a)*Math.cos(e), -Math.sin(e)];
+    for (const it of visibleItems()){ if (it.t!=="poly") continue; const fs=[]; for (const f of prismFaces3(it)){ const nn=newell(f); if (nn[0]*v[0]+nn[1]*v[1]+nn[2]*v[2] >= 0) continue; const pts=f.map(p=>proj(p[0],p[1],p[2])); const shadeF = Math.abs(nn[2])>Math.hypot(nn[0],nn[1]) ? 1.0 : (Math.abs(nn[0])>Math.abs(nn[1])?0.78:0.62); fs.push({pts, col:shade(it.c,shadeF), d:Math.min(...pts.map(p=>p.d))}); } if (fs.length) items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))}); } }
   // design items
-  for (const it of visibleItems()){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ // point marker: small post
+  for (const it of visibleItems()){ if (it.t==="poly") continue; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ // point marker: small post
       const fs=boxFaces(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); continue; }
     const zz0 = L.ceil ? 2.95 : z0, zz1 = L.ceil ? 3.0 : z0 + Math.max(h,0.02); if (cut3d && zz0>=H) continue;
     const fs=boxFaces(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2,zz0,Math.min(zz1,cut3d?Math.max(H,zz0+0.02):zz1),L.c,-(it.r||0),it.x,it.y); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); }
@@ -539,7 +631,8 @@ function drawWalk(){
   for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; let col = k==="manwar"?"#9a9a9a":F.c; let pc = S.finishes[k].ceil||"#efece6"; if (showReality && k!=="manwar"){ const pr=S.progress[k]||{}; if (pr.floor<2) col=CONC; if (pr.plaster<2) pc="#9d9890"; }
     for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); faces.push(...facesOfBox(x,y,fx,fy,-0.1,0,col)); if (k!=="manwar"&&k!=="balcony") faces.push(...facesOfBox(x,y,fx,fy,3.0,3.08,pc)); } }
   for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; const k=roomAt((x1+x2)/2,(y1+y2)/2); const base = kind==="E"?"#d9d4ca":kind==="I"?"#e6e2d8":kind==="L"?"#bfd3e6":kind==="P"?"#cbbfa6":"#6a6a66"; faces.push(...facesOfBox(x1,y1,x2,y2,z0,z1,base,0,0,0,kind)); }
-  for (const it of visibleItems()){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
+  for (const it of visibleItems()){ if (it.t!=="poly") continue; for (const f of prismFaces3(it)){ const nn=newell(f); const c0=f.reduce((s,p)=>[s[0]+p[0]/f.length,s[1]+p[1]/f.length,s[2]+p[2]/f.length],[0,0,0]); const d=[c0[0]-P.x,c0[1]-P.y,c0[2]-P.z]; if (nn[0]*d[0]+nn[1]*d[1]+nn[2]*d[2] >= 0) continue; const dist=Math.hypot(...d); const shadeF = Math.abs(nn[2])>Math.hypot(nn[0],nn[1]) ? 1.0 : (Math.abs(nn[0])>Math.abs(nn[1])?0.88:0.76); faces.push({pts:f, col:shade(it.c, shadeF*Math.max(0.72,1-dist/30)), dist}); } }
+  for (const it of visibleItems()){ if (it.t==="poly") continue; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
     faces.push(...facesOfBox(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2, L.ceil?2.95:z0, L.ceil?3.0:z0+Math.max(h,0.02), L.c, -(it.r||0), it.x, it.y)); }
   // wall paint: tint interior wall faces by room paint is complex; skip. Sort & draw
   faces.sort((a,b)=>b.dist-a.dist);
@@ -549,7 +642,7 @@ function drawWalk(){
   ctx.font="600 14px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; const t=roomName(P.x,P.y); const tw=ctx.measureText(t).width+16; ctx.fillStyle="rgba(255,255,255,.85)"; ctx.fillRect(W/2-tw/2, 12, tw, 26); ctx.fillStyle="#1d1d1b"; ctx.fillText(t, W/2, 25);
 }
 function blocked(x,y){ const r=0.22; for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1]=b; if (z0>1.5 || z1<0.4) continue; if (x>x1-r&&x<x2+r&&y>y1-r&&y<y2+r) return true; }
-  for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt||L.wall||L.ceil) continue; const h=it.h??L.h; if (h<0.3) continue; const w=it.w??L.w, d=it.d??L.d; const a=((it.r||0)%180)!==0; const hw=(a?d:w)/2, hd=(a?w:d)/2; if (x>it.x-hw-r&&x<it.x+hw+r&&y>it.y-hd-r&&y<it.y+hd+r) return true; } return false; }
+  for (const it of S.items){ if (it.t==="poly"){ if (it.plane!=="floor" || (it.z0||0)>1.2 || (it.h||0)<0.3) continue; if (pointInPoly(x,y,polyWorld(it))) return true; continue; } const L=LIB.find(l=>l.id===it.t); if (L.pt||L.wall||L.ceil) continue; const h=it.h??L.h; if (h<0.3) continue; const w=it.w??L.w, d=it.d??L.d; const a=((it.r||0)%180)!==0; const hw=(a?d:w)/2, hd=(a?w:d)/2; if (x>it.x-hw-r&&x<it.x+hw+r&&y>it.y-hd-r&&y<it.y+hd+r) return true; } return false; }
 let lastT=0;
 function step(t){ if (!walk) return; const dt=Math.min(0.05,(t-lastT)/1000||0.016); lastT=t;
   let mx=0, my=0; if (padState.f||keys["ArrowUp"]||keys["w"]) my=1; if (padState.b||keys["ArrowDown"]||keys["s"]) my=-1; if (keys["a"]) mx=-1; if (keys["d"]) mx=1; if (padState.l||keys["ArrowLeft"]) P.yaw-=80*dt; if (padState.r||keys["ArrowRight"]) P.yaw+=80*dt;
