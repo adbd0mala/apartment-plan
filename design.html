@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>صمّم الشقة</title>
+<style>
+  :root{--bg:#f4f2ee;--fg:#1d1d1b;--muted:#6b6b66;--panel:#ffffff;--line:#d9d6cf;--accent:#1f4e79;--accent2:#c05621;--ok:#2f855a}
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--panel:#242423;--line:#3a3a38;--accent:#7fb2e6;--accent2:#f0944d;--ok:#68d391}}
+  :root[data-theme="dark"]{--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--panel:#242423;--line:#3a3a38;--accent:#7fb2e6;--accent2:#f0944d;--ok:#68d391}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden;overscroll-behavior:none}
+  #app{display:flex;flex-direction:column;height:100%}
+  header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+  header h1{font-size:15px;margin:0;flex:1}
+  .tabs{display:flex;gap:4px;padding:6px 8px;min-height:48px;align-items:center;overflow-y:hidden;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
+  .tabs button{flex:none}
+  button{font:inherit;font-size:13px;padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
+  button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  button.warn{border-color:var(--accent2);color:var(--accent2)}
+  button.sm{padding:5px 9px;font-size:12px}
+  #stage{flex:1;position:relative;touch-action:none;background:var(--bg)}
+  canvas{display:block;width:100%;height:100%}
+  #lib{display:flex;gap:6px;padding:8px 8px 10px;min-height:84px;overflow-x:auto;white-space:nowrap;background:var(--panel);border-top:1px solid var(--line)}
+  .item{flex:none;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 8px;border:1px solid var(--line);border-radius:10px;min-width:74px;font-size:12px;cursor:pointer;background:var(--bg)}
+  .item.on{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+  .item small{color:var(--muted);font-size:10px}
+  .item i{display:block;width:28px;height:18px;border-radius:3px;border:1px solid #0003}
+  #sel{display:none;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
+  #sel.on{display:flex}
+  #sel .name{flex:1;font-size:13px;font-weight:600}
+  #sheet{position:absolute;inset:auto 0 0 0;max-height:70%;overflow:auto;background:var(--panel);border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 14px 20px;display:none;z-index:5;box-shadow:0 -6px 24px #0002}
+  #sheet.on{display:block}
+  #sheet h2{font-size:15px;margin:0 0 8px}
+  .row{display:flex;gap:8px;align-items:center;margin:8px 0;flex-wrap:wrap}
+  .row label{font-size:13px;min-width:110px;color:var(--muted)}
+  select,input[type=text],input[type=number]{font:inherit;font-size:13px;padding:6px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--fg)}
+  input[type=color]{width:40px;height:32px;border:1px solid var(--line);border-radius:8px;background:none;padding:0}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  td,th{border-bottom:1px solid var(--line);padding:5px 6px;text-align:right}
+  th{color:var(--muted);font-weight:600}
+  .hint{position:absolute;top:8px;left:8px;right:8px;text-align:center;font-size:12px;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:6px 10px;pointer-events:none;opacity:.95}
+  textarea{width:100%;height:120px;font:12px monospace;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap}
+  .sw{width:34px;height:34px;border-radius:8px;border:2px solid transparent;cursor:pointer}
+  .sw.on{border-color:var(--accent)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>صمّم الشقة <span style="color:var(--muted);font-weight:400;font-size:12px">· v2.3 · تصميمك محفوظ على جهازك</span></h1>
+    <button class="sm" id="bFit">⤢</button>
+    <button class="sm" id="bQty">الكميات</button>
+    <button class="sm" id="bSave">حفظ / تصدير</button>
+  </header>
+  <div class="tabs" id="tabs"></div>
+  <div id="stage">
+    <canvas id="c"></canvas>
+    <div class="hint" id="hint">اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها</div>
+    <div id="sheet"></div>
+  </div>
+  <div id="sel">
+    <span class="name" id="selName"></span>
+    <button class="sm" id="bRot">↻ لف 90°</button>
+    <button class="sm" id="bDup">نسخ</button>
+    <button class="sm" id="bEdit">المقاس</button>
+    <button class="sm warn" id="bDel">حذف</button>
+    <button class="sm" id="bClose">✕</button>
+  </div>
+  <div id="lib"></div>
+</div>
+
+<script>
+// ===================== البيانات الثابتة =====================
+const GEO = {"TI": 0.1, "TE": 0.2, "ROOMS": {"living": {"name": "الصالة", "box": [0.0, 0.0, 3.5, 4.7], "dims": "3.50 × 4.70"}, "kids": {"name": "غرفة الأطفال", "box": [3.6, 0.35, 7.15, 4.7], "dims": "3.55 × 4.35"}, "room2": {"name": "الغرفة الثانية", "box": [-5.25, 1.45, -1.35, 4.7], "dims": "3.90 × 3.25"}, "kitchen": {"name": "المطبخ", "box": [-5.25, -0.8, -2.55, 1.35], "dims": "2.70 × 2.15"}, "bath": {"name": "الحمام", "box": [-1.25, 1.45, -0.1, 3.55], "dims": "1.15 × 2.10"}, "manwar": {"name": "منور", "box": [-1.25, 3.65, -0.1, 4.7], "dims": "1.15 × 1.05"}, "corr": {"name": "الطرقة", "box": [-2.45, 0.0, 0.0, 1.35], "dims": "2.45 × 1.35"}, "niche": {"name": "تجويف الغسالة", "box": [-2.45, -1.45, -1.45, 0.0], "dims": "1.00 × 1.45"}, "balcony": {"name": "البلكونة", "box": [7.35, 0.35, 8.25, 3.95], "dims": "0.90 × 3.60"}}, "WALLS": [[-5.45, -1.0, -2.45, -0.8, "E"], [-2.65, -1.65, -2.45, -0.8, "E"], [-2.55, -1.65, -1.25, -1.45, "E"], [-1.45, -1.65, -1.25, 0.0, "E"], [-1.25, -0.2, 3.5, 0.0, "E"], [3.5, 0.15, 8.35, 0.35, "E"], [3.5, -0.2, 3.6, 0.35, "E"], [-5.45, -1.0, -5.25, 4.9, "E"], [-5.45, 4.7, 0.0, 4.9, "E"], [0.0, 4.7, 7.35, 4.9, "E"], [7.15, 3.95, 7.35, 4.9, "E"], [7.15, 0.15, 7.35, 3.95, "E"], [-0.1, 1.35, 0.0, 4.7, "I"], [-1.35, 1.35, -1.25, 4.7, "I"], [-1.25, 3.55, -0.1, 3.65, "I"], [-2.45, 1.35, -0.1, 1.45, "I"], [-5.25, 1.35, -2.45, 1.45, "I"], [3.5, 0.35, 3.6, 4.7, "I"], [-0.2, 0.0, 0.0, 0.2, "E"]], "LOW_WALLS": [[-2.55, -0.8, -2.45, 0.45, 1.5]], "PARAPET": [[8.25, 0.15, 8.35, 4.05], [7.35, 3.95, 8.35, 4.05]], "DOORS": {"main": {"box": [2.5, -0.2, 3.5, 0.0], "w": 1.0, "label": "باب الشقة 1.00"}, "kids": {"box": [3.5, 0.95, 3.6, 1.85], "w": 0.9, "label": "باب الأطفال 0.90"}, "bath": {"box": [-1.25, 1.35, -0.55, 1.45], "w": 0.7, "label": "باب الحمام 0.70"}, "room2": {"box": [-2.45, 1.35, -1.55, 1.45], "w": 0.9, "label": "باب الغرفة الثانية 0.90"}, "balcony": {"box": [7.15, 0.85, 7.35, 1.65], "w": 0.8, "label": "باب البلكونة 0.80"}, "kitchen": {"box": [-2.55, 0.45, -2.45, 1.35], "w": 0.9, "label": "باب المطبخ 0.90", "no_lintel": true}}, "ARCH": {"box": [-0.1, 0.0, 0.0, 1.35], "label": "قوس مدخل الطرقة"}, "WINDOWS": {"living": {"box": [-0.1, 3.75, 0.0, 4.65], "size": "0.90×0.90", "sill": 1.3, "label": "ش. الصالة"}, "kids": {"box": [7.15, 3.2, 7.35, 4.1], "size": "0.90×0.90", "sill": 1.3, "label": "ش. الأطفال"}, "room2": {"box": [-1.35, 3.95, -1.25, 4.55], "size": "0.60×0.60", "sill": 2.0, "label": "ش. الغرفة الثانية"}, "bath": {"box": [-1.25, 3.55, -0.65, 3.65], "size": "0.60×0.60", "sill": 1.9, "label": "ش. الحمام"}, "kitchen": {"box": [-4.35, -1.0, -3.75, -0.8], "size": "0.60×0.60", "sill": 1.8, "label": "ش. المطبخ"}, "vent": {"box": [-5.25, -1.0, -4.85, -0.8], "size": "0.40×0.40", "sill": 2.2, "label": "تهوية المطبخ"}}, "COLUMNS": [[7.0, 0.35, 7.15, 0.75, "عمود 0.40 × بروز 0.15"], [-5.25, 4.55, -4.85, 4.7, "عمود 0.40 × بروز 0.15"], [-1.75, 4.55, -1.35, 4.7, "عمود 0.40 × بروز 0.15"], [-5.25, 1.45, -5.1, 1.85, "عمود 0.40 × بروز 0.15"], [3.475, 0.35, 3.625, 0.75, "عمود 0.40 × 0.15 مدفون"]]};
+const ROOM_ORDER = ["living","kids","room2","kitchen","bath","corr","niche","balcony","manwar"];
+
+// مكتبة العناصر: w = البعد على X, d = البعد على Y (بالمتر), h = الارتفاع, cat = التبويب
+const LIB = [
+ // غرف النوم
+ {id:"bed160",cat:"نوم",name:"سرير 160",w:1.60,d:2.00,h:0.50,c:"#8ea7c9"},
+ {id:"bed180",cat:"نوم",name:"سرير 180",w:1.80,d:2.00,h:0.50,c:"#8ea7c9"},
+ {id:"bed120",cat:"نوم",name:"سرير 120",w:1.20,d:2.00,h:0.50,c:"#8ea7c9"},
+ {id:"bed90",cat:"نوم",name:"سرير 90",w:0.90,d:2.00,h:0.50,c:"#8ea7c9"},
+ {id:"bunk",cat:"نوم",name:"سرير دورين",w:1.00,d:2.00,h:1.70,c:"#7f99bd"},
+ {id:"night",cat:"نوم",name:"كمودينو",w:0.50,d:0.40,h:0.55,c:"#b89b74"},
+ {id:"ward2",cat:"نوم",name:"دولاب 2 ضلفة",w:1.00,d:0.60,h:2.40,c:"#a0784f"},
+ {id:"ward3",cat:"نوم",name:"دولاب 3 ضلف",w:1.50,d:0.60,h:2.40,c:"#a0784f"},
+ {id:"ward4",cat:"نوم",name:"دولاب 4 ضلف",w:2.00,d:0.60,h:2.40,c:"#a0784f"},
+ {id:"ward6",cat:"نوم",name:"دولاب جرار",w:2.40,d:0.65,h:2.40,c:"#a0784f"},
+ {id:"dresser",cat:"نوم",name:"تسريحة",w:1.20,d:0.45,h:0.80,c:"#c4a77d"},
+ {id:"desk",cat:"نوم",name:"مكتب",w:1.20,d:0.60,h:0.75,c:"#c4a77d"},
+ // الصالة
+ {id:"sofa3",cat:"صالة",name:"كنبة 3",w:2.10,d:0.90,h:0.85,c:"#9c8aa5"},
+ {id:"sofa2",cat:"صالة",name:"كنبة 2",w:1.60,d:0.90,h:0.85,c:"#9c8aa5"},
+ {id:"arm",cat:"صالة",name:"فوتيه",w:0.90,d:0.90,h:0.85,c:"#9c8aa5"},
+ {id:"lsofa",cat:"صالة",name:"ركنة L",w:2.60,d:1.70,h:0.85,c:"#9c8aa5",shape:"L"},
+ {id:"coffee",cat:"صالة",name:"ترابيزة وسط",w:1.00,d:0.60,h:0.45,c:"#c4a77d"},
+ {id:"tv",cat:"صالة",name:"مكتبة تلفزيون",w:1.80,d:0.45,h:0.60,c:"#a0784f"},
+ {id:"tvwall",cat:"صالة",name:"شاشة 55\"",w:1.25,d:0.08,h:0.72,c:"#333",wall:true},
+ {id:"dine4",cat:"صالة",name:"سفرة 4 كراسي",w:1.20,d:0.80,h:0.75,c:"#b89b74"},
+ {id:"dine6",cat:"صالة",name:"سفرة 6 كراسي",w:1.80,d:0.90,h:0.75,c:"#b89b74"},
+ {id:"buffet",cat:"صالة",name:"بوفيه",w:1.60,d:0.45,h:0.85,c:"#a0784f"},
+ {id:"shoe",cat:"صالة",name:"جزامة",w:0.90,d:0.35,h:1.00,c:"#a0784f"},
+ // المطبخ
+ {id:"base60",cat:"مطبخ",name:"وحدة أرضية 60",w:0.60,d:0.60,h:0.90,c:"#d9b38c"},
+ {id:"base80",cat:"مطبخ",name:"وحدة أرضية 80",w:0.80,d:0.60,h:0.90,c:"#d9b38c"},
+ {id:"base100",cat:"مطبخ",name:"وحدة أرضية 100",w:1.00,d:0.60,h:0.90,c:"#d9b38c"},
+ {id:"corner",cat:"مطبخ",name:"ركن أرضي 90×90",w:0.90,d:0.90,h:0.90,c:"#d9b38c"},
+ {id:"sink",cat:"مطبخ",name:"حوض 80",w:0.80,d:0.60,h:0.90,c:"#9ec5d6",plumb:true},
+ {id:"sink2",cat:"مطبخ",name:"حوض حوضين 100",w:1.00,d:0.60,h:0.90,c:"#9ec5d6",plumb:true},
+ {id:"cooker60",cat:"مطبخ",name:"بوتاجاز 60",w:0.60,d:0.60,h:0.90,c:"#c96a5a",elec:true},
+ {id:"cooker90",cat:"مطبخ",name:"بوتاجاز 90",w:0.90,d:0.60,h:0.90,c:"#c96a5a",elec:true},
+ {id:"hood",cat:"مطبخ",name:"شفاط",w:0.60,d:0.50,h:0.15,c:"#999",wall:true,elec:true},
+ {id:"fridge",cat:"مطبخ",name:"ثلاجة 70",w:0.70,d:0.70,h:1.80,c:"#bfc9cc",elec:true},
+ {id:"fridge60",cat:"مطبخ",name:"ثلاجة 60",w:0.60,d:0.65,h:1.70,c:"#bfc9cc",elec:true},
+ {id:"washer",cat:"مطبخ",name:"غسالة 60",w:0.60,d:0.60,h:0.85,c:"#cfd8dc",elec:true,plumb:true},
+ {id:"dish",cat:"مطبخ",name:"غسالة أطباق",w:0.60,d:0.60,h:0.85,c:"#cfd8dc",elec:true,plumb:true},
+ {id:"heater",cat:"مطبخ",name:"سخان",w:0.45,d:0.30,h:0.75,c:"#e0e0e0",wall:true,plumb:true},
+ {id:"upper",cat:"مطبخ",name:"وحدة علوية 60",w:0.60,d:0.35,h:0.70,c:"#e8cfae",wall:true,z:1.50},
+ {id:"upper80",cat:"مطبخ",name:"وحدة علوية 80",w:0.80,d:0.35,h:0.70,c:"#e8cfae",wall:true,z:1.50},
+ {id:"counter",cat:"مطبخ",name:"رخامة البار",w:1.25,d:0.30,h:0.04,c:"#777",z:1.50},
+ // الحمام
+ {id:"wc",cat:"حمام",name:"قاعدة إفرنجي",w:0.40,d:0.70,h:0.80,c:"#eef2f5",plumb:true},
+ {id:"wcb",cat:"حمام",name:"قاعدة بلدي",w:0.60,d:0.70,h:0.10,c:"#eef2f5",plumb:true},
+ {id:"basin",cat:"حمام",name:"حوض",w:0.55,d:0.45,h:0.85,c:"#eef2f5",plumb:true},
+ {id:"vanity",cat:"حمام",name:"وحدة حوض 80",w:0.80,d:0.50,h:0.85,c:"#d9b38c",plumb:true},
+ {id:"shower80",cat:"حمام",name:"دش 80×80",w:0.80,d:0.80,h:2.00,c:"#9ec5d6",plumb:true},
+ {id:"shower90",cat:"حمام",name:"دش 90×90",w:0.90,d:0.90,h:2.00,c:"#9ec5d6",plumb:true},
+ {id:"tub",cat:"حمام",name:"بانيو 170×70",w:0.70,d:1.70,h:0.55,c:"#9ec5d6",plumb:true},
+ {id:"bidet",cat:"حمام",name:"بيديه",w:0.40,d:0.60,h:0.40,c:"#eef2f5",plumb:true},
+ {id:"heaterb",cat:"حمام",name:"سخان",w:0.45,d:0.30,h:0.75,c:"#e0e0e0",wall:true,plumb:true},
+ {id:"mirror",cat:"حمام",name:"مراية",w:0.60,d:0.03,h:0.80,c:"#cfe3ee",wall:true,z:1.10},
+ // أجهزة
+ {id:"ac",cat:"أجهزة",name:"تكييف سبليت",w:0.90,d:0.25,h:0.30,c:"#f0f0f0",wall:true,z:2.40,elec:true},
+ {id:"acout",cat:"أجهزة",name:"وحدة خارجية",w:0.80,d:0.30,h:0.55,c:"#ccc",wall:true,z:0.60},
+ {id:"fan",cat:"أجهزة",name:"مروحة سقف",w:0.30,d:0.30,h:0.05,c:"#ddd",elec:true,ceil:true},
+ {id:"tvb",cat:"أجهزة",name:"تلفزيون أوضة",w:1.00,d:0.08,h:0.58,c:"#333",wall:true,z:1.10,elec:true},
+ // كهرباء (نقط)
+ {id:"light",cat:"كهرباء",name:"نقطة إضاءة",w:0.25,d:0.25,h:0,c:"#f6c445",pt:"light",ceil:true},
+ {id:"spot",cat:"كهرباء",name:"سبوت",w:0.12,d:0.12,h:0,c:"#f6d97a",pt:"light",ceil:true},
+ {id:"socket",cat:"كهرباء",name:"بريزة",w:0.12,d:0.08,h:0,c:"#e07b39",pt:"socket",wall:true,z:0.30},
+ {id:"socket2",cat:"كهرباء",name:"بريزة مزدوجة",w:0.16,d:0.08,h:0,c:"#e07b39",pt:"socket",wall:true,z:0.30},
+ {id:"socketc",cat:"كهرباء",name:"بريزة كاونتر",w:0.12,d:0.08,h:0,c:"#e07b39",pt:"socket",wall:true,z:1.10},
+ {id:"switch",cat:"كهرباء",name:"مفتاح",w:0.10,d:0.08,h:0,c:"#3d7eaa",pt:"switch",wall:true,z:1.20},
+ {id:"acpt",cat:"كهرباء",name:"نقطة تكييف",w:0.14,d:0.08,h:0,c:"#c0392b",pt:"ac",wall:true,z:2.30},
+ {id:"tvpt",cat:"كهرباء",name:"نقطة تلفزيون/نت",w:0.14,d:0.08,h:0,c:"#8e44ad",pt:"data",wall:true,z:0.30},
+ {id:"bell",cat:"كهرباء",name:"جرس/إنتركم",w:0.10,d:0.08,h:0,c:"#3d7eaa",pt:"switch",wall:true,z:1.40},
+ // سباكة (نقط)
+ {id:"cw",cat:"سباكة",name:"تغذية بارد",w:0.10,d:0.10,h:0,c:"#2b6cb0",pt:"cold",wall:true},
+ {id:"hw",cat:"سباكة",name:"تغذية ساخن",w:0.10,d:0.10,h:0,c:"#c53030",pt:"hot",wall:true},
+ {id:"drain",cat:"سباكة",name:"صرف أرضي",w:0.15,d:0.15,h:0,c:"#4a5568",pt:"drain"},
+ {id:"fdrain",cat:"سباكة",name:"بلاعة",w:0.12,d:0.12,h:0,c:"#718096",pt:"floor"},
+ {id:"gas",cat:"سباكة",name:"نقطة غاز",w:0.10,d:0.10,h:0,c:"#d69e2e",pt:"gas",wall:true},
+ // عام
+ {id:"box",cat:"عام",name:"مكعب حر (عدّل مقاسه)",w:1.00,d:1.00,h:1.00,c:"#b5b5b5"},
+ {id:"door",cat:"عام",name:"ضلفة باب 0.90",w:0.90,d:0.05,h:2.10,c:"#8b5a2b"},
+ {id:"plant",cat:"عام",name:"نباتة",w:0.40,d:0.40,h:1.20,c:"#6aa36a"},
+ {id:"rug",cat:"عام",name:"سجادة 2×3",w:2.00,d:3.00,h:0.01,c:"#b56b6b"},
+];
+const CATS = ["نوم","صالة","مطبخ","حمام","أجهزة","كهرباء","سباكة","عام"];
+
+// خامات الأرضيات
+const FLOORS = [
+ {id:"none",name:"غير محدد",c:"#ece8e0"},
+ {id:"cer60",name:"سيراميك 60×60 فاتح",c:"#e6e1d6",tile:0.60},
+ {id:"cer60g",name:"سيراميك 60×60 رمادي",c:"#c9c9c6",tile:0.60},
+ {id:"porc80",name:"بورسلين 80×80",c:"#ded8cc",tile:0.80},
+ {id:"porc120",name:"بورسلين 60×120",c:"#d8d2c6",tile:0.60,tile2:1.20},
+ {id:"wood",name:"سيراميك خشبي 20×120",c:"#b98a5a",tile:0.20,tile2:1.20},
+ {id:"hdf",name:"باركيه HDF",c:"#c89a67",tile:0.19,tile2:1.20},
+ {id:"marble",name:"رخام",c:"#e9e6df",tile:0.60},
+ {id:"cer30",name:"سيراميك 30×30 (حمام)",c:"#cfd9d9",tile:0.30},
+ {id:"cer40",name:"سيراميك 40×40",c:"#d5d0c4",tile:0.40},
+];
+const PAINTS = ["#f5f1e8","#ffffff","#e9e4d6","#d9d4c7","#cfd8dc","#b7c9d6","#dfe7d1","#efd9c1","#e8c9b5","#c9b8a8","#9fb4c7","#8e9aaf","#6b7f99","#a3b18a","#d4a373","#555555"];
+
+// ===================== الحالة =====================
+const KEY = "apartment-design-v1";
+let S = {version:1, items:[], finishes:{}, wallTile:{}, notes:""};
+try { const s = localStorage.getItem(KEY); if (s) S = Object.assign(S, JSON.parse(s)); } catch(e){}
+for (const k of ROOM_ORDER) { S.finishes[k] ??= {floor: (k==="bath"||k==="kitchen"||k==="niche"||k==="balcony") ? "cer30" : "none", paint:"#f5f1e8", tileH: (k==="bath") ? 3.0 : (k==="kitchen"||k==="niche") ? 2.4 : 0, ceil:"#ffffff"}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+
+// ===================== الرسم =====================
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+const stage = document.getElementById('stage');
+let view = {s: 60, ox: 0, oy: 0}; // s = px per metre; plan y up → screen y down
+let dpr = 1;
+function fit(){ const r = stage.getBoundingClientRect(); dpr = Math.min(devicePixelRatio||1, 2); cv.width = r.width*dpr; cv.height = r.height*dpr;
+  const xs=[-5.6, 8.6], ys=[-1.9, 5.1]; const s = Math.min(r.width/(xs[1]-xs[0]), r.height/(ys[1]-ys[0]))*0.92;
+  view.s = s; view.ox = r.width/2 - s*(xs[0]+xs[1])/2; view.oy = r.height/2 + s*(ys[0]+ys[1])/2; draw(); }
+const X = x => view.ox + x*view.s, Y = y => view.oy - y*view.s;
+const ix = px => (px - view.ox)/view.s, iy = py => (view.oy - py)/view.s;
+let sel = null, tool = null, cat = CATS[0], showPts = true;
+function rect(b, fill, stroke, lw){ const [x1,y1,x2,y2]=b; ctx.beginPath(); ctx.rect(X(x1), Y(y2), (x2-x1)*view.s, (y2-y1)*view.s); if (fill){ctx.fillStyle=fill; ctx.fill();} if (stroke){ctx.strokeStyle=stroke; ctx.lineWidth=lw||1; ctx.stroke();} }
+function drawTiles(b, f){ if (!f.tile) return; const [x1,y1,x2,y2]=b; const tw=f.tile, th=f.tile2||f.tile; ctx.save(); ctx.beginPath(); ctx.rect(X(x1),Y(y2),(x2-x1)*view.s,(y2-y1)*view.s); ctx.clip(); ctx.strokeStyle="rgba(0,0,0,.12)"; ctx.lineWidth=1;
+  for (let x=x1; x<x2; x+=tw){ ctx.beginPath(); ctx.moveTo(X(x),Y(y1)); ctx.lineTo(X(x),Y(y2)); ctx.stroke(); }
+  for (let y=y1; y<y2; y+=th){ ctx.beginPath(); ctx.moveTo(X(x1),Y(y)); ctx.lineTo(X(x2),Y(y)); ctx.stroke(); } ctx.restore(); }
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cv.width,cv.height);
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  // rooms (floors)
+  for (const k of ROOM_ORDER){ const r = GEO.ROOMS[k]; const f = FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; rect(r.box, k==="manwar" ? (dark?"#2a2a2a":"#dcdcdc") : f.c); if (k!=="manwar") drawTiles(r.box, f);
+    // paint strip (room border) to show wall colour
+    if (k!=="manwar" && k!=="balcony"){ ctx.save(); ctx.strokeStyle = S.finishes[k].paint; ctx.lineWidth = Math.max(3, 0.08*view.s); const [x1,y1,x2,y2]=r.box; ctx.strokeRect(X(x1)+ctx.lineWidth/2, Y(y2)+ctx.lineWidth/2, (x2-x1)*view.s-ctx.lineWidth, (y2-y1)*view.s-ctx.lineWidth); ctx.restore(); }
+  }
+  // walls
+  for (const w of GEO.WALLS) rect(w, w[4]==="E" ? (dark?"#dcdcdc":"#1a1a1a") : (dark?"#8a8a8a":"#8d8d8d"));
+  for (const w of GEO.LOW_WALLS) rect(w, dark?"#6a8aa8":"#9cbad6");
+  for (const p of GEO.PARAPET) rect(p, dark?"#777":"#bbb");
+  for (const c of GEO.COLUMNS) rect(c, dark?"#eee":"#000");
+  // openings
+  const op = (b, col) => rect(b, col);
+  for (const d of Object.values(GEO.DOORS)) op(d.box, dark?"#1b1b1a":"#f4f2ee");
+  op(GEO.ARCH.box, dark?"#1b1b1a":"#f4f2ee");
+  for (const w of Object.values(GEO.WINDOWS)) { op(w.box, "#bfe3f5"); }
+  // door swing lines (blue)
+  ctx.strokeStyle = "#1f6fb2"; ctx.lineWidth = 1.5;
+  for (const d of Object.values(GEO.DOORS)) { const [x1,y1,x2,y2]=d.box; ctx.beginPath(); if (x2-x1 > y2-y1) { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1),Y(y1+d.w)); ctx.arc(X(x1),Y(y1),d.w*view.s,-Math.PI/2,0); } else { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1+d.w),Y(y1)); ctx.arc(X(x1),Y(y1),d.w*view.s,0,-Math.PI/2,true);} ctx.stroke(); }
+  // items
+  for (const it of S.items) drawItem(it, it===sel);
+  // room labels
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const cx=(x1+x2)/2, cy=(y1+y2)/2; const fs = Math.max(10, Math.min(16, view.s*0.22));
+    ctx.font = `600 ${fs}px system-ui, sans-serif`; const t = r.name; const tw = ctx.measureText(t).width+10;
+    ctx.fillStyle = dark?"rgba(36,36,35,.85)":"rgba(255,255,255,.85)"; ctx.fillRect(X(cx)-tw/2, Y(cy)-fs*0.75, tw, fs*1.5); ctx.fillStyle = dark?"#ececea":"#1d1d1b"; ctx.fillText(t, X(cx), Y(cy)); }
+  // scale
+  ctx.fillStyle = dark?"#ececea":"#1d1d1b"; ctx.fillRect(12, cv.height/dpr-18, view.s, 3); ctx.font="11px system-ui"; ctx.textAlign="left"; ctx.fillText("1 م", 12, cv.height/dpr-24);
+}
+function drawItem(it, on){
+  const L = LIB.find(l=>l.id===it.t) || LIB[0]; const w = it.w ?? L.w, d = it.d ?? L.d; const rot = it.r||0;
+  ctx.save(); ctx.translate(X(it.x), Y(it.y)); ctx.rotate(-rot*Math.PI/180);
+  const pw = w*view.s, pd = d*view.s;
+  if (L.pt) { // نقطة
+    ctx.beginPath(); ctx.arc(0,0, Math.max(5, Math.min(pw, 14)), 0, Math.PI*2); ctx.fillStyle = L.c; ctx.fill(); ctx.strokeStyle = on?"#1f4e79":"#0006"; ctx.lineWidth = on?3:1; ctx.stroke();
+    ctx.fillStyle="#000"; ctx.font="bold 9px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText({light:"L",socket:"S",switch:"K",ac:"AC",data:"TV",cold:"C",hot:"H",drain:"D",floor:"F",gas:"G"}[L.pt]||"", 0, 0);
+  } else {
+    ctx.fillStyle = L.c; ctx.globalAlpha = L.ceil ? 0.6 : (L.wall && L.z ? 0.75 : 0.92);
+    if (L.shape==="L") { ctx.beginPath(); ctx.moveTo(-pw/2,-pd/2); ctx.lineTo(pw/2,-pd/2); ctx.lineTo(pw/2,-pd/2+0.9*view.s); ctx.lineTo(-pw/2+0.9*view.s,-pd/2+0.9*view.s); ctx.lineTo(-pw/2+0.9*view.s,pd/2); ctx.lineTo(-pw/2,pd/2); ctx.closePath(); ctx.fill(); }
+    else ctx.fillRect(-pw/2,-pd/2,pw,pd);
+    ctx.globalAlpha = 1; ctx.strokeStyle = on?"#1f4e79":"#0008"; ctx.lineWidth = on?3:1; ctx.strokeRect(-pw/2,-pd/2,pw,pd);
+    if (pw > 28 && pd > 14) { ctx.fillStyle="#000c"; ctx.font=`${Math.max(9,Math.min(12,pd*0.35))}px system-ui`; ctx.textAlign="center"; ctx.textBaseline="middle";
+      ctx.rotate(rot*Math.PI/180); ctx.fillText(L.name, 0, -5); ctx.font="9px system-ui"; ctx.fillText(`${w.toFixed(2)}×${d.toFixed(2)}`, 0, 7); }
+  }
+  ctx.restore();
+}
+addEventListener('resize', fit);
+
+// ===================== التفاعل =====================
+const ptrs = new Map(); let drag = null, pinch = null, moved = false, downAt = 0;
+function hit(x, y){ for (let i=S.items.length-1;i>=0;i--){ const it=S.items[i]; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
+function roomAt(x,y){ for (const k of ROOM_ORDER){ const [x1,y1,x2,y2]=GEO.ROOMS[k].box; if (x>=x1&&x<=x2&&y>=y1&&y<=y2) return k; } return null; }
+const snap = v => Math.round(v*20)/20;
+stage.addEventListener('pointerdown', e => { if (e.target!==cv) return; cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX,y:e.clientY}); moved=false; downAt=Date.now();
+  if (ptrs.size===2){ const [a,b]=[...ptrs.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y), cx:(a.x+b.x)/2, cy:(a.y+b.y)/2, s:view.s, ox:view.ox, oy:view.oy}; drag=null; return; }
+  const r = cv.getBoundingClientRect(); const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top);
+  const h = hit(x,y);
+  if (h){ sel = h; drag = {it:h, dx:h.x-x, dy:h.y-y}; showSel(); draw(); }
+  else drag = {pan:true, x0:e.clientX, y0:e.clientY, ox:view.ox, oy:view.oy};
+});
+stage.addEventListener('pointermove', e => { if (!ptrs.has(e.pointerId)) return; ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if (pinch && ptrs.size===2){ const [a,b]=[...ptrs.values()]; const d=Math.hypot(a.x-b.x,a.y-b.y); const k=d/pinch.d; const cx=(a.x+b.x)/2, cy=(a.y+b.y)/2; const r=cv.getBoundingClientRect();
+    view.s = Math.min(400, Math.max(20, pinch.s*k)); const kk = view.s/pinch.s; view.ox = (cx-r.left) - ((pinch.cx-r.left)-pinch.ox)*kk + (cx-pinch.cx)*0; view.oy = (cy-r.top) - ((pinch.cy-r.top)-pinch.oy)*kk; moved=true; draw(); return; }
+  if (!drag) return; const r = cv.getBoundingClientRect();
+  if (drag.pan){ if (Math.hypot(e.clientX-drag.x0,e.clientY-drag.y0)>4) moved=true; view.ox = drag.ox + (e.clientX-drag.x0); view.oy = drag.oy + (e.clientY-drag.y0); draw(); }
+  else { const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top); drag.it.x = snap(x+drag.dx); drag.it.y = snap(y+drag.dy); moved=true; draw(); }
+});
+function up(e){ ptrs.delete(e.pointerId); if (ptrs.size<2) pinch=null;
+  if (drag && !drag.pan && moved) save();
+  if (drag && drag.pan && !moved && Date.now()-downAt < 500){ // tap on empty space
+    const r = cv.getBoundingClientRect(); const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top);
+    if (tool){ const L = LIB.find(l=>l.id===tool); S.items.push({id:Date.now().toString(36), t:tool, x:snap(x), y:snap(y), r:0}); sel = S.items[S.items.length-1]; save(); showSel(); draw(); }
+    else { const k = roomAt(x,y); if (k && k!=="manwar") openRoom(k); else { sel=null; showSel(); draw(); } }
+  }
+  drag=null; }
+stage.addEventListener('pointerup', up); stage.addEventListener('pointercancel', up);
+stage.addEventListener('wheel', e => { e.preventDefault(); const r=cv.getBoundingClientRect(); const k = e.deltaY<0?1.1:1/1.1; const px=e.clientX-r.left, py=e.clientY-r.top; view.ox = px - (px-view.ox)*k; view.oy = py - (py-view.oy)*k; view.s*=k; draw(); }, {passive:false});
+
+// ===================== المكتبة والتبويبات =====================
+const tabs = document.getElementById('tabs'), lib = document.getElementById('lib');
+function renderTabs(){ tabs.innerHTML=""; for (const c of CATS){ const b=document.createElement('button'); b.textContent=c; b.className = c===cat?"on":""; b.onclick=()=>{cat=c; tool=null; renderTabs(); renderLib();}; tabs.appendChild(b); }
+  const b2=document.createElement('button'); b2.textContent = showPts ? "إخفاء النقط" : "إظهار النقط"; b2.onclick=()=>{showPts=!showPts; renderTabs(); draw();}; tabs.appendChild(b2); }
+function renderLib(){ lib.innerHTML=""; for (const L of LIB.filter(l=>l.cat===cat)){ const d=document.createElement('div'); d.className="item"+(tool===L.id?" on":""); d.innerHTML=`<i style="background:${L.c}"></i><span>${L.name}</span><small>${L.pt?"نقطة":(L.w.toFixed(2)+"×"+L.d.toFixed(2))}</small>`; d.onclick=()=>{ tool = tool===L.id ? null : L.id; renderLib(); document.getElementById('hint').textContent = tool ? `اضغط في المخطط مكان: ${L.name}` : "اختار عنصر من تحت ثم اضغط مكانه في المخطط"; }; lib.appendChild(d); } }
+renderTabs(); renderLib();
+
+// ===================== شريط العنصر المحدد =====================
+const selBar = document.getElementById('sel');
+function showSel(){ if (!sel){ selBar.classList.remove('on'); return; } const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); selBar.classList.add('on'); }
+document.getElementById('bRot').onclick=()=>{ if(sel){ sel.r=((sel.r||0)+90)%360; save(); draw(); } };
+document.getElementById('bDel').onclick=()=>{ if(sel){ S.items=S.items.filter(i=>i!==sel); sel=null; save(); showSel(); draw(); } };
+document.getElementById('bDup').onclick=()=>{ if(sel){ const c=Object.assign({},sel,{id:Date.now().toString(36), x:sel.x+0.3, y:sel.y-0.3}); S.items.push(c); sel=c; save(); showSel(); draw(); } };
+document.getElementById('bClose').onclick=()=>{ sel=null; tool=null; renderLib(); showSel(); draw(); };
+document.getElementById('bEdit').onclick=()=>{ if(!sel) return; const L=LIB.find(l=>l.id===sel.t);
+  openSheet(`<h2>مقاس: ${L.name}</h2>
+  <div class="row"><label>العرض (م)</label><input type="number" step="0.05" id="ew" value="${(sel.w??L.w).toFixed(2)}"></div>
+  <div class="row"><label>العمق (م)</label><input type="number" step="0.05" id="ed" value="${(sel.d??L.d).toFixed(2)}"></div>
+  <div class="row"><label>الارتفاع (م)</label><input type="number" step="0.05" id="eh" value="${(sel.h??L.h).toFixed(2)}"></div>
+  <div class="row"><label>ملاحظة</label><input type="text" id="en" value="${sel.n||""}" style="flex:1"></div>
+  <div class="row"><button class="on" id="eok">تم</button></div>`);
+  document.getElementById('eok').onclick=()=>{ sel.w=+document.getElementById('ew').value; sel.d=+document.getElementById('ed').value; sel.h=+document.getElementById('eh').value; sel.n=document.getElementById('en').value; save(); closeSheet(); showSel(); draw(); }; };
+
+// ===================== الشيت (تشطيب الغرفة / كميات / حفظ) =====================
+const sheet = document.getElementById('sheet');
+function openSheet(html){ sheet.innerHTML = html + `<div class="row" style="justify-content:flex-start"><button id="sclose">إغلاق</button></div>`; sheet.classList.add('on'); document.getElementById('sclose').onclick=closeSheet; }
+function closeSheet(){ sheet.classList.remove('on'); }
+function openRoom(k){ const f=S.finishes[k]; const r=GEO.ROOMS[k]; const wet = k==="bath"||k==="kitchen"||k==="niche";
+  openSheet(`<h2>تشطيب: ${r.name} <span style="color:var(--muted);font-weight:400;font-size:12px">(${r.dims})</span></h2>
+  <div class="row"><label>الأرضية</label><select id="ff">${FLOORS.map(x=>`<option value="${x.id}" ${x.id===f.floor?"selected":""}>${x.name}</option>`).join("")}</select></div>
+  <div class="row"><label>لون الدهان</label><div class="swatches" id="sw">${PAINTS.map(c=>`<div class="sw ${c===f.paint?"on":""}" data-c="${c}" style="background:${c}"></div>`).join("")}<input type="color" id="fc" value="${f.paint}"></div></div>
+  <div class="row"><label>سيراميك الحوائط</label><select id="fh"><option value="0" ${f.tileH==0?"selected":""}>بدون</option><option value="1.2" ${f.tileH==1.2?"selected":""}>لحد 1.20 (وزرة عالية)</option><option value="1.5" ${f.tileH==1.5?"selected":""}>لحد 1.50</option><option value="2.4" ${f.tileH==2.4?"selected":""}>لحد 2.40</option><option value="3" ${f.tileH==3?"selected":""}>لحد السقف 3.00</option></select></div>
+  <div class="row"><label>السقف</label><select id="fce"><option value="plain" ${f.ceilType!=="gypsum"?"selected":""}>محارة ودهان</option><option value="gypsum" ${f.ceilType==="gypsum"?"selected":""}>جبس بورد</option></select></div>
+  <div class="row"><label>ملاحظات</label><input type="text" id="fn" value="${f.note||""}" style="flex:1" placeholder="مثلًا: ورق حائط على حيطة السرير"></div>
+  <div class="row"><button class="on" id="fok">حفظ</button></div>`);
+  sheet.querySelectorAll('.sw').forEach(el=>el.onclick=()=>{ sheet.querySelectorAll('.sw').forEach(x=>x.classList.remove('on')); el.classList.add('on'); document.getElementById('fc').value=el.dataset.c; });
+  document.getElementById('fok').onclick=()=>{ f.floor=document.getElementById('ff').value; f.paint=document.getElementById('fc').value; f.tileH=+document.getElementById('fh').value; f.ceilType=document.getElementById('fce').value; f.note=document.getElementById('fn').value; save(); closeSheet(); draw(); }; }
+
+// ===================== الكميات =====================
+const H = 3.00;
+function perim(b){ const [x1,y1,x2,y2]=b; return 2*((x2-x1)+(y2-y1)); }
+function openings(k){ // مساحة الفتحات على حوائط الغرفة (تقريبي: تُنسب الفتحة للغرفة التي تلامس صندوقها)
+  let a=0, pr=0; const [x1,y1,x2,y2]=GEO.ROOMS[k].box; const touch=b=>!(b[2]<x1-0.11||b[0]>x2+0.11||b[3]<y1-0.11||b[1]>y2+0.11);
+  for (const d of Object.values(GEO.DOORS)) if (touch(d.box)) { a+=d.w*2.2; pr+=d.w; }
+  if (touch(GEO.ARCH.box)) { a+=1.35*2.4; pr+=1.35; }
+  for (const w of Object.values(GEO.WINDOWS)) if (touch(w.box)) { const [ww,hh]=w.size.split("×").map(Number); a+=ww*hh; }
+  return {a, pr}; }
+function quantities(){
+  const rows=[]; let floors={}, wallTile=0, paint=0, plaster=0, ceil=0, gyps=0, skirting=0;
+  for (const k of ROOM_ORDER){ if (k==="manwar") continue; const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const area=(x2-x1)*(y2-y1); const f=S.finishes[k]; const F=FLOORS.find(x=>x.id===f.floor);
+    floors[F.name]=(floors[F.name]||0)+area;
+    if (k==="balcony"){ rows.push([r.name, area.toFixed(2), "—", "—", "—"]); continue; }
+    const op=openings(k); const P=perim(b=r.box); const walls=P*H-op.a; const tileA=Math.max(0, P*f.tileH - (f.tileH>0 ? op.a*Math.min(1,f.tileH/2.2) : 0));
+    const paintA=Math.max(0, walls-tileA); wallTile+=tileA; paint+=paintA; plaster+=walls; ceil+=area; if (f.ceilType==="gypsum") gyps+=area; if (f.tileH===0) skirting+=P-op.pr;
+    rows.push([r.name, area.toFixed(2), tileA.toFixed(1), paintA.toFixed(1), F.name]); }
+  const cnt={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); cnt[L.name]=(cnt[L.name]||0)+1; }
+  const pts={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt) pts[L.pt]=(pts[L.pt]||0)+1; }
+  const elecApp = S.items.filter(it=>LIB.find(l=>l.id===it.t).elec).length, plumbApp = S.items.filter(it=>LIB.find(l=>l.id===it.t).plumb).length;
+  return {rows, floors, wallTile, paint, plaster, ceil, gyps, skirting, cnt, pts, elecApp, plumbApp}; }
+document.getElementById('bQty').onclick=()=>{ const q=quantities();
+  const ptName={light:"نقط إضاءة",socket:"برايز",switch:"مفاتيح",ac:"نقط تكييف",data:"تلفزيون/نت",cold:"تغذية بارد",hot:"تغذية ساخن",drain:"صرف",floor:"بلاعات",gas:"غاز"};
+  openSheet(`<h2>جدول الكميات (صافي – أضف 10% هالك)</h2>
+  <table><tr><th>الفراغ</th><th>أرضية م²</th><th>سيراميك حوائط م²</th><th>نقاشة م²</th><th>خامة الأرضية</th></tr>${q.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</table>
+  <h2 style="margin-top:12px">الإجماليات</h2>
+  <table>
+  ${Object.entries(q.floors).map(([n,a])=>`<tr><td>أرضيات – ${n}</td><td>${a.toFixed(2)} م²</td></tr>`).join("")}
+  <tr><td>سيراميك حوائط</td><td>${q.wallTile.toFixed(1)} م²</td></tr>
+  <tr><td>محارة حوائط (بعد خصم الفتحات)</td><td>${q.plaster.toFixed(1)} م²</td></tr>
+  <tr><td>محارة أسقف</td><td>${q.ceil.toFixed(1)} م²</td></tr>
+  <tr><td>نقاشة حوائط</td><td>${q.paint.toFixed(1)} م²</td></tr>
+  <tr><td>نقاشة أسقف</td><td>${(q.ceil-q.gyps).toFixed(1)} م²</td></tr>
+  <tr><td>جبس بورد</td><td>${q.gyps.toFixed(1)} م²</td></tr>
+  <tr><td>وزرة (الغرف بدون سيراميك حوائط)</td><td>${q.skirting.toFixed(1)} م.ط</td></tr>
+  <tr><td>أبواب</td><td>${Object.keys(GEO.DOORS).length} (1.00 / 0.90×3 / 0.80 / 0.70)</td></tr>
+  <tr><td>شبابيك</td><td>${Object.keys(GEO.WINDOWS).length}</td></tr>
+  </table>
+  <h2 style="margin-top:12px">الكهرباء والسباكة (النقط اللي حطيتها)</h2>
+  <table>${Object.entries(q.pts).map(([p,n])=>`<tr><td>${ptName[p]||p}</td><td>${n}</td></tr>`).join("") || "<tr><td colspan=2>لم تُضف نقط بعد – من تبويب كهرباء/سباكة</td></tr>"}
+  <tr><td>أجهزة تحتاج كهرباء</td><td>${q.elecApp}</td></tr><tr><td>عناصر تحتاج سباكة</td><td>${q.plumbApp}</td></tr></table>
+  <h2 style="margin-top:12px">العناصر</h2>
+  <table>${Object.entries(q.cnt).map(([n,c])=>`<tr><td>${n}</td><td>${c}</td></tr>`).join("") || "<tr><td colspan=2>لا يوجد</td></tr>"}</table>`); };
+
+// ===================== حفظ / تصدير / استيراد =====================
+document.getElementById('bSave').onclick=()=>{ const js=JSON.stringify(S);
+  openSheet(`<h2>حفظ / تصدير</h2>
+  <p style="font-size:13px;color:var(--muted)">التصميم بيتحفظ تلقائيًا على هذا الجهاز. عشان تبعته أو ترفعه على الريبو: انسخ النص ده واحفظه باسم <b>design.json</b>.</p>
+  <div class="row"><button class="on" id="cp">نسخ JSON</button><button id="dl">تحميل design.json</button><span id="cpmsg" style="font-size:12px;color:var(--ok)"></span></div>
+  <textarea id="ta" readonly>${js.replace(/</g,"&lt;")}</textarea>
+  <h2 style="margin-top:10px">استيراد</h2>
+  <div class="row"><input type="file" id="imp" accept=".json,application/json"><button id="paste">لصق من النص</button></div>
+  <textarea id="tin" placeholder="الصق JSON هنا ثم اضغط لصق من النص"></textarea>
+  <div class="row"><button class="warn" id="reset">مسح كل التصميم</button></div>`);
+  document.getElementById('cp').onclick=()=>{ const ta=document.getElementById('ta'); ta.select(); try{ navigator.clipboard.writeText(js).then(()=>document.getElementById('cpmsg').textContent="اتنسخ ✓", ()=>{document.execCommand('copy'); document.getElementById('cpmsg').textContent="اتنسخ ✓";}); }catch(e){ document.execCommand('copy'); } };
+  document.getElementById('dl').onclick=()=>{ try{ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([js],{type:'application/json'})); a.download='design.json'; a.click(); }catch(e){ document.getElementById('cpmsg').textContent="التحميل ممنوع هنا – استخدم نسخ"; } };
+  document.getElementById('imp').onchange=e=>{ const f=e.target.files[0]; if(!f) return; f.text().then(t=>{ try{ S=Object.assign(S, JSON.parse(t)); save(); closeSheet(); draw(); }catch(err){ alert("ملف غير صالح"); } }); };
+  document.getElementById('paste').onclick=()=>{ try{ S=Object.assign(S, JSON.parse(document.getElementById('tin').value)); save(); closeSheet(); draw(); }catch(err){ document.getElementById('cpmsg').textContent="النص مش JSON صالح"; } };
+  document.getElementById('reset').onclick=()=>{ if (confirm("مسح كل العناصر والتشطيبات؟")) { S.items=[]; for (const k in S.finishes) S.finishes[k]={floor:"none",paint:"#f5f1e8",tileH:0}; save(); closeSheet(); draw(); } }; };
+
+document.getElementById('bFit').onclick=fit;
+fit();
+</script>
+</body>
+</html>
