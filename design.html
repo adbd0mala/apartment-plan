@@ -30,6 +30,9 @@
   #sel{display:none;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
   #sel.on{display:flex}
   #sel .name{flex:1;font-size:13px;font-weight:600}
+  #joy{position:absolute;left:18px;bottom:18px;width:120px;height:120px;border-radius:50%;background:rgba(127,127,127,.18);border:1px solid var(--line);display:none;z-index:4;touch-action:none}
+  #joy i{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:var(--accent);opacity:.85}
+  #walkHelp{position:absolute;right:12px;bottom:18px;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;display:none;z-index:4}
   #sheet{position:absolute;inset:auto 0 0 0;max-height:70%;overflow:auto;background:var(--panel);border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 14px 20px;display:none;z-index:5;box-shadow:0 -6px 24px #0002}
   #sheet.on{display:block}
   #sheet h2{font-size:15px;margin:0 0 8px}
@@ -51,7 +54,7 @@
 <div id="app">
   <header>
     <h1>صمّم الشقة</h1>
-    <button class="sm on" id="b2d">2D</button><button class="sm" id="b3d">3D</button><button class="sm" id="bCut3" style="display:none">قص 1.20</button>
+    <button class="sm on" id="b2d">2D</button><button class="sm" id="b3d">3D</button><button class="sm" id="bCut3" style="display:none">قص 1.20</button><button class="sm" id="bWalk" style="display:none">🚶 مشي</button>
     <button class="sm" id="bFit">⤢</button>
     <button class="sm" id="bQty">الكميات</button>
     <button class="sm" id="bSave">حفظ / تصدير</button>
@@ -61,6 +64,7 @@
     <canvas id="c"></canvas>
     <div class="hint" id="hint">اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها</div>
     <div id="sheet"></div>
+    <div id="joy"><i></i></div><div id="walkHelp">إصبع شمال: العصا للمشي · إصبع يمين: اسحب للنظر</div>
   </div>
   <div id="sel">
     <span class="name" id="selName"></span>
@@ -421,11 +425,69 @@ function draw3d(){
   ctx.fillStyle = dark?"#ececea":"#1d1d1b"; ctx.font="11px system-ui"; ctx.textAlign="left"; ctx.fillText(`زاوية ${Math.round(cam.az)}° · ميل ${Math.round(cam.el)}°`, 12, cv.height/dpr-12);
 }
 const draw2d = draw;
-draw = function(){ if (mode3d) draw3d(); else draw2d(); };
-function setMode(m){ mode3d = m; document.getElementById('b2d').classList.toggle('on',!m); document.getElementById('b3d').classList.toggle('on',m); document.getElementById('bCut3').style.display = m?"":"none"; document.getElementById('lib').style.display = m?"none":""; document.getElementById('tabs').style.display = m?"none":""; if (m) { sel=null; showSel(); } document.getElementById('hint').textContent = m ? "اسحب للدوران · إصبعين للتقريب · التعديل من وضع 2D وبيظهر هنا فورًا" : "اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها"; if (m) fit3d(); else fit(); draw(); }
+draw = function(){ if (mode3d && walk) drawWalk(); else if (mode3d) draw3d(); else draw2d(); };
+function setMode(m){ mode3d = m; if (!m && walk) setWalk(false); document.getElementById('bWalk').style.display = m?"":"none"; document.getElementById('b2d').classList.toggle('on',!m); document.getElementById('b3d').classList.toggle('on',m); document.getElementById('bCut3').style.display = m?"":"none"; document.getElementById('lib').style.display = m?"none":""; document.getElementById('tabs').style.display = m?"none":""; if (m) { sel=null; showSel(); } document.getElementById('hint').textContent = m ? "اسحب للدوران · إصبعين للتقريب · التعديل من وضع 2D وبيظهر هنا فورًا" : "اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها"; if (m) fit3d(); else fit(); draw(); }
 document.getElementById('b2d').onclick=()=>setMode(false); document.getElementById('b3d').onclick=()=>setMode(true);
 document.getElementById('bCut3').onclick=e=>{ cut3d=!cut3d; e.target.classList.toggle('on',cut3d); draw(); };
 const _fit = fit; fit = function(){ if (mode3d){ fit3d(); draw(); } else _fit(); };
+
+// ===================== وضع المشي (منظور أول شخص على Canvas) =====================
+let walk = false; const P = {x:3.0, y:-0.6, z:1.60, yaw:0, pitch:0}; let joyVec={x:0,y:0}, look=null, joyId=null, raf=null, keys={};
+const joy=document.getElementById('joy'), joyKnob=joy.querySelector('i'), walkHelp=document.getElementById('walkHelp');
+function roomName(x,y){ const k=roomAt(x,y); return k?GEO.ROOMS[k].name:"خارج الشقة"; }
+function camT(x,y,z){ const yw=P.yaw*Math.PI/180, pt=P.pitch*Math.PI/180; const dx=x-P.x, dy=y-P.y, dz=z-P.z; const fx=Math.sin(yw), fy=Math.cos(yw); const rx=Math.cos(yw), ry=-Math.sin(yw);
+  const xc=dx*rx+dy*ry, yc=dx*fx+dy*fy; const dep=yc*Math.cos(pt)+dz*Math.sin(pt), up=-yc*Math.sin(pt)+dz*Math.cos(pt); return [xc,dep,up]; }
+function clipNear(poly){ const N=0.06, out=[]; for (let i=0;i<poly.length;i++){ const a=poly[i], b=poly[(i+1)%poly.length]; const ain=a[1]>N, bin=b[1]>N; if (ain) out.push(a); if (ain!==bin){ const t=(N-a[1])/(b[1]-a[1]); out.push([a[0]+(b[0]-a[0])*t, N, a[2]+(b[2]-a[2])*t]); } } return out; }
+function facesOfBox(x1,y1,x2,y2,z0,z1,col,rot,cx,cy){
+  const R = rot ? (px,py)=>{ const a=rot*Math.PI/180; const dx=px-cx, dy=py-cy; return [cx+dx*Math.cos(a)-dy*Math.sin(a), cy+dx*Math.sin(a)+dy*Math.cos(a)]; } : (px,py)=>[px,py];
+  const c=[[x1,y1],[x2,y1],[x2,y2],[x1,y2]].map(p=>R(...p)); const out=[];
+  const push=(pts3, f)=>{ // backface: normal via cross of first two edges (world), compare with cam dir
+    const [a,b,c3]=pts3; const u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c3[0]-a[0],c3[1]-a[1],c3[2]-a[2]]; const n=[u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+    const ctr=pts3.reduce((s,p)=>[s[0]+p[0]/pts3.length,s[1]+p[1]/pts3.length,s[2]+p[2]/pts3.length],[0,0,0]); const d=[ctr[0]-P.x,ctr[1]-P.y,ctr[2]-P.z];
+    if (n[0]*d[0]+n[1]*d[1]+n[2]*d[2] >= 0) return; const dist=Math.hypot(d[0],d[1],d[2]); out.push({pts:pts3, col:shade(col, f*Math.max(0.72, 1-dist/30)), dist}); };
+  push([[...c[0],z1],[...c[1],z1],[...c[2],z1],[...c[3],z1]], 1.0);           // top (normal +z, CCW seen from above)
+  push([[...c[0],z0],[...c[3],z0],[...c[2],z0],[...c[1],z0]], 0.9);           // bottom
+  for (let i=0;i<4;i++){ const A=c[i], B=c[(i+1)%4]; push([[...A,z0],[...B,z0],[...B,z1],[...A,z1]], (Math.abs(B[0]-A[0])>Math.abs(B[1]-A[1]))?0.88:0.76); }
+  return out; }
+function drawWalk(){
+  ctx.setTransform(dpr,0,0,dpr,0,0); const W=cv.width/dpr, Hh=cv.height/dpr; const focal=(W/2)/Math.tan(70*Math.PI/360);
+  // sky / ground backdrop
+  const g=ctx.createLinearGradient(0,0,0,Hh); g.addColorStop(0,"#cfdcea"); g.addColorStop(0.5,"#e8eef3"); g.addColorStop(0.5,"#b9b3a6"); g.addColorStop(1,"#a39d90"); ctx.fillStyle=g; ctx.fillRect(0,0,W,Hh);
+  const faces=[];
+  const dark=false;
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; const col = k==="manwar"?"#9a9a9a":F.c; const pc = S.finishes[k].ceil||"#efece6";
+    for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); faces.push(...facesOfBox(x,y,fx,fy,-0.1,0,col)); if (k!=="manwar"&&k!=="balcony") faces.push(...facesOfBox(x,y,fx,fy,3.0,3.08,pc)); } }
+  for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; const k=roomAt((x1+x2)/2,(y1+y2)/2); const base = kind==="E"?"#d9d4ca":kind==="I"?"#e6e2d8":kind==="L"?"#bfd3e6":kind==="P"?"#cbbfa6":"#6a6a66"; faces.push(...facesOfBox(x1,y1,x2,y2,z0,z1,base)); }
+  for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
+    faces.push(...facesOfBox(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2, L.ceil?2.95:z0, L.ceil?3.0:z0+Math.max(h,0.02), L.c, -(it.r||0), it.x, it.y)); }
+  // wall paint: tint interior wall faces by room paint is complex; skip. Sort & draw
+  faces.sort((a,b)=>b.dist-a.dist);
+  for (const f of faces){ const cp=clipNear(f.pts.map(p=>camT(...p))); if (cp.length<3) continue; ctx.beginPath(); let first=true; for (const [xc,dep,up] of cp){ const sx=W/2+xc/dep*focal, sy=Hh/2-up/dep*focal; if (first){ctx.moveTo(sx,sy); first=false;} else ctx.lineTo(sx,sy); } ctx.closePath(); ctx.fillStyle=f.col; ctx.fill(); ctx.strokeStyle="rgba(0,0,0,.15)"; ctx.lineWidth=0.5; ctx.stroke(); }
+  // crosshair + room
+  ctx.strokeStyle="rgba(0,0,0,.35)"; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(W/2-8,Hh/2); ctx.lineTo(W/2+8,Hh/2); ctx.moveTo(W/2,Hh/2-8); ctx.lineTo(W/2,Hh/2+8); ctx.stroke();
+  ctx.font="600 14px system-ui"; ctx.textAlign="center"; ctx.textBaseline="middle"; const t=roomName(P.x,P.y); const tw=ctx.measureText(t).width+16; ctx.fillStyle="rgba(255,255,255,.85)"; ctx.fillRect(W/2-tw/2, 12, tw, 26); ctx.fillStyle="#1d1d1b"; ctx.fillText(t, W/2, 25);
+}
+function blocked(x,y){ const r=0.22; for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1]=b; if (z0>1.5 || z1<0.4) continue; if (x>x1-r&&x<x2+r&&y>y1-r&&y<y2+r) return true; }
+  for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt||L.wall||L.ceil) continue; const h=it.h??L.h; if (h<0.3) continue; const w=it.w??L.w, d=it.d??L.d; const a=((it.r||0)%180)!==0; const hw=(a?d:w)/2, hd=(a?w:d)/2; if (x>it.x-hw-r&&x<it.x+hw+r&&y>it.y-hd-r&&y<it.y+hd+r) return true; } return false; }
+let lastT=0;
+function step(t){ if (!walk) return; const dt=Math.min(0.05,(t-lastT)/1000||0.016); lastT=t;
+  let mx=joyVec.x, my=joyVec.y; if (keys["ArrowUp"]||keys["w"]) my=1; if (keys["ArrowDown"]||keys["s"]) my=-1; if (keys["a"]) mx=-1; if (keys["d"]) mx=1; if (keys["ArrowLeft"]) P.yaw-=90*dt; if (keys["ArrowRight"]) P.yaw+=90*dt;
+  if (mx||my){ const sp=1.4*dt; const yw=P.yaw*Math.PI/180; const fx=Math.sin(yw), fy=Math.cos(yw), rx=Math.cos(yw), ry=-Math.sin(yw); const nx=P.x+(fx*my+rx*mx)*sp, ny=P.y+(fy*my+ry*mx)*sp; if (!blocked(nx,P.y)) P.x=nx; if (!blocked(P.x,ny)) P.y=ny; }
+  drawWalk(); raf=requestAnimationFrame(step); }
+function setWalk(on){ walk=on; document.getElementById('bWalk').classList.toggle('on',on); joy.style.display=on?"block":"none"; walkHelp.style.display=on?"block":"none"; document.getElementById('bCut3').style.display=on?"none":""; document.getElementById('hint').style.display=on?"none":"";
+  if (on){ if (!roomAt(P.x,P.y)) { P.x=3.0; P.y=-0.8; P.yaw=0; P.pitch=0; } lastT=performance.now(); raf=requestAnimationFrame(step); } else { cancelAnimationFrame(raf); draw(); } }
+document.getElementById('bWalk').onclick=()=>setWalk(!walk);
+// joystick
+joy.addEventListener('pointerdown', e=>{ joy.setPointerCapture(e.pointerId); joyId=e.pointerId; e.stopPropagation(); });
+joy.addEventListener('pointermove', e=>{ if (e.pointerId!==joyId) return; const r=joy.getBoundingClientRect(); let dx=e.clientX-(r.left+60), dy=e.clientY-(r.top+60); const m=Math.hypot(dx,dy); if (m>45){dx*=45/m; dy*=45/m;} joyKnob.style.left=(40+dx)+"px"; joyKnob.style.top=(40+dy)+"px"; joyVec={x:dx/45, y:-dy/45}; });
+const joyEnd=e=>{ if (e.pointerId!==joyId) return; joyId=null; joyVec={x:0,y:0}; joyKnob.style.left="40px"; joyKnob.style.top="40px"; };
+joy.addEventListener('pointerup', joyEnd); joy.addEventListener('pointercancel', joyEnd);
+// look (drag on canvas while walking) – registered in capture phase before the 3D orbit handler
+stage.addEventListener('pointerdown', e=>{ if (!walk || e.target!==cv) return; e.stopImmediatePropagation(); cv.setPointerCapture(e.pointerId); look={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:P.yaw,pitch:P.pitch}; }, true);
+stage.addEventListener('pointermove', e=>{ if (!walk || !look || e.pointerId!==look.id) return; e.stopImmediatePropagation(); P.yaw = look.yaw + (e.clientX-look.x)*0.35; P.pitch = Math.max(-60, Math.min(60, look.pitch + (e.clientY-look.y)*0.25)); }, true);
+const lookEnd=e=>{ if (!walk) return; e.stopImmediatePropagation(); if (look && e.pointerId===look.id) look=null; }; stage.addEventListener('pointerup', lookEnd, true); stage.addEventListener('pointercancel', lookEnd, true);
+addEventListener('keydown', e=>{ keys[e.key]=true; if (walk && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault(); }); addEventListener('keyup', e=>{ keys[e.key]=false; });
+
 // 3D interaction: override pointer handlers when in 3D
 let rot = null;
 stage.addEventListener('pointerdown', e => { if (!mode3d || e.target!==cv) return; e.stopImmediatePropagation(); cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
