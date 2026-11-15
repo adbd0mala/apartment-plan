@@ -19,6 +19,7 @@
   .tabs button{flex:none}
   button{font:inherit;font-size:13px;padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--panel);color:var(--fg);cursor:pointer}
   button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  #bImag.on,#bRealM.on{background:var(--accent2);border-color:var(--accent2)}
   button.warn{border-color:var(--accent2);color:var(--accent2)}
   button.sm{padding:5px 9px;font-size:12px}
   #stage{flex:1;position:relative;touch-action:none;background:var(--bg)}
@@ -72,8 +73,10 @@
 <div id="app">
   <header>
     <h1>صمّم الشقة</h1>
+    <button class="sm on" id="bImag" style="border-color:var(--accent2)">تخيّل</button><button class="sm" id="bRealM" style="border-color:var(--accent2)">حقيقي</button>
     <button class="sm on" id="b2d">2D</button><button class="sm" id="b3d">3D</button><button class="sm" id="bCut3" style="display:none">قص 1.20</button><button class="sm" id="bWalk" style="display:none">🚶 مشي</button>
     <button class="sm" id="bFit">⤢</button>
+    <button class="sm" id="bProg">التنفيذ</button>
     <button class="sm" id="bQty">الكميات</button>
     <button class="sm" id="bSave">حفظ / تصدير</button>
   </header>
@@ -89,6 +92,7 @@
     <button class="sm" id="bRot">↻ لف 90°</button>
     <button class="sm" id="bDup">نسخ</button>
     <button class="sm" id="bEdit">المقاس</button>
+    <button class="sm" id="bRealItem">موجود فعلًا</button>
     <button class="sm warn" id="bDel">حذف</button>
     <button class="sm" id="bClose">✕</button>
   </div>
@@ -207,6 +211,18 @@ try { const s = localStorage.getItem(KEY); if (s) S = Object.assign(S, JSON.pars
 const WET = k => k==="bath"||k==="kitchen"||k==="niche";
 for (const k of ROOM_ORDER) { S.finishes[k] ??= {floor: (WET(k)||k==="balcony") ? "cer30" : "none", paint:"#f5f1e8", tileH: WET(k) ? 2.0 : 0, ceil:"#ffffff"}; S.finishes[k].wallTile ??= WET(k) ? "#cfdfe6" : "#dfe7d1"; }
 S.finishes.corr.barTile ??= true;
+// حالة التنفيذ: 0 لم يبدأ · 1 جاري · 2 تم  — مرحلة × غرفة
+const STAGES=[["masonry","مباني"],["frames","حلوق أبواب"],["plumb","سباكة تأسيس"],["elec","كهرباء تأسيس"],["plaster","محارة"],["water","عزل"],["floor","سيراميك أرضيات"],["wtile","سيراميك حوائط"],["paint","نقاشة"],["win","شبابيك"],["doors","أبواب (ضلف)"],["fix","تركيبات"]];
+const PROG_ROOMS=["living","kids","room2","kitchen","bath","corr","niche","balcony"];
+S.progress ??= {};
+for (const k of PROG_ROOMS){ S.progress[k] ??= {}; for (const [id] of STAGES) S.progress[k][id] ??= 0; }
+if (!S.progressSeeded){ // بداية من صور الموقع (14/11) – صحّحها
+  for (const k of PROG_ROOMS) S.progress[k].masonry = 2;
+  for (const k of ["bath","room2","kids","living"]) S.progress[k].frames = 2; // حلوق خشب ظاهرة في الصور
+  S.progress.bath.plumb = 1; S.progress.kitchen.plumb = 0; S.progress.niche.plumb = 1;
+  for (const k of ["living","kids","room2","corr","bath"]) S.progress[k].elec = 1; // مواسير/تخريم ظاهر
+  S.progressSeeded = true; save(); }
+let showReality = false;
 function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
 
 // ===================== الرسم =====================
@@ -228,7 +244,8 @@ function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,cv.width,cv.height);
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   // rooms (floors)
-  for (const k of ROOM_ORDER){ const r = GEO.ROOMS[k]; const f = FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; rect(r.box, k==="manwar" ? (dark?"#2a2a2a":"#dcdcdc") : f.c); if (k!=="manwar") drawTiles(r.box, f);
+  for (const k of ROOM_ORDER){ const r = GEO.ROOMS[k]; const f = FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; const realUnfin = showReality && k!=="manwar" && (S.progress[k]||{}).floor<2; rect(r.box, k==="manwar" ? (dark?"#2a2a2a":"#dcdcdc") : (realUnfin?CONC:f.c)); if (k!=="manwar" && !realUnfin) drawTiles(r.box, f);
+    if (realUnfin){ ctx.save(); ctx.font=`${Math.max(9,view.s*0.14)}px system-ui`; ctx.fillStyle="#6b6b66"; ctx.textAlign="center"; ctx.fillText("خرسانة", X((r.box[0]+r.box[2])/2), Y(r.box[1]+0.25)); ctx.restore(); }
     // paint strip (room border) to show wall colour
     if (k!=="manwar" && k!=="balcony"){ ctx.save(); ctx.strokeStyle = (WET(k) && S.finishes[k].tileH>0) ? S.finishes[k].wallTile : S.finishes[k].paint; ctx.lineWidth = Math.max(3, 0.08*view.s); const [x1,y1,x2,y2]=r.box; ctx.strokeRect(X(x1)+ctx.lineWidth/2, Y(y2)+ctx.lineWidth/2, (x2-x1)*view.s-ctx.lineWidth, (y2-y1)*view.s-ctx.lineWidth); ctx.restore(); }
   }
@@ -247,7 +264,7 @@ function draw(){
   ctx.strokeStyle = "#1f6fb2"; ctx.lineWidth = 1.5;
   for (const d of Object.values(GEO.DOORS)) { const [x1,y1,x2,y2]=d.box; ctx.beginPath(); if (x2-x1 > y2-y1) { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1),Y(y1+d.w)); ctx.arc(X(x1),Y(y1),d.w*view.s,-Math.PI/2,0); } else { ctx.moveTo(X(x1),Y(y1)); ctx.lineTo(X(x1+d.w),Y(y1)); ctx.arc(X(x1),Y(y1),d.w*view.s,0,-Math.PI/2,true);} ctx.stroke(); }
   // items
-  for (const it of S.items) drawItem(it, it===sel);
+  for (const it of visibleItems()) drawItem(it, it===sel);
   // room labels
   ctx.textAlign="center"; ctx.textBaseline="middle";
   for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const cx=(x1+x2)/2, cy=(y1+y2)/2; const fs = Math.max(10, Math.min(16, view.s*0.22));
@@ -277,7 +294,7 @@ addEventListener('resize', fit);
 
 // ===================== التفاعل =====================
 const ptrs = new Map(); let drag = null, pinch = null, moved = false, downAt = 0;
-function hit(x, y){ for (let i=S.items.length-1;i>=0;i--){ const it=S.items[i]; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
+function hit(x, y){ const arr=visibleItems(); for (let i=arr.length-1;i>=0;i--){ const it=arr[i]; const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d; const a=-(it.r||0)*Math.PI/180; const dx=x-it.x, dy=y-it.y; const lx=dx*Math.cos(-a)-dy*Math.sin(-a), ly=dx*Math.sin(-a)+dy*Math.cos(-a); const tol = L.pt ? 0.18 : 0.05; if (Math.abs(lx)<=w/2+tol && Math.abs(ly)<=d/2+tol) return it; } return null; }
 function roomAt(x,y){ for (const k of ROOM_ORDER){ const [x1,y1,x2,y2]=GEO.ROOMS[k].box; if (x>=x1&&x<=x2&&y>=y1&&y<=y2) return k; } return null; }
 const snap = v => Math.round(v*20)/20;
 stage.addEventListener('pointerdown', e => { if (e.target!==cv) return; cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, {x:e.clientX,y:e.clientY}); moved=false; downAt=Date.now();
@@ -298,7 +315,7 @@ function up(e){ ptrs.delete(e.pointerId); if (ptrs.size<2) pinch=null;
   if (drag && !drag.pan && moved) save();
   if (drag && drag.pan && !moved && Date.now()-downAt < 500){ // tap on empty space
     const r = cv.getBoundingClientRect(); const x = ix(e.clientX-r.left), y = iy(e.clientY-r.top);
-    if (tool){ const L = LIB.find(l=>l.id===tool); S.items.push({id:Date.now().toString(36), t:tool, x:snap(x), y:snap(y), r:0}); sel = S.items[S.items.length-1]; save(); showSel(); draw(); }
+    if (tool){ const L = LIB.find(l=>l.id===tool); S.items.push({id:Date.now().toString(36), t:tool, x:snap(x), y:snap(y), r:0, real: showReality||undefined}); sel = S.items[S.items.length-1]; save(); showSel(); draw(); }
     else { const k = roomAt(x,y); if (k && k!=="manwar") openRoom(k); else { sel=null; showSel(); draw(); } }
   }
   drag=null; }
@@ -314,7 +331,8 @@ renderTabs(); renderLib();
 
 // ===================== شريط العنصر المحدد =====================
 const selBar = document.getElementById('sel');
-function showSel(){ if (!sel){ selBar.classList.remove('on'); return; } const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); selBar.classList.add('on'); }
+function showSel(){ if (!sel){ selBar.classList.remove('on'); return; } const L=LIB.find(l=>l.id===sel.t); document.getElementById('selName').textContent = `${L.name} – ${(sel.w??L.w).toFixed(2)}×${(sel.d??L.d).toFixed(2)} م` + (roomAt(sel.x,sel.y)?` – ${GEO.ROOMS[roomAt(sel.x,sel.y)].name}`:""); document.getElementById('bRealItem').classList.toggle('on', !!sel.real); selBar.classList.add('on'); }
+document.getElementById('bRealItem').onclick=()=>{ if(sel){ sel.real=!sel.real; save(); showSel(); draw(); } };
 document.getElementById('bRot').onclick=()=>{ if(sel){ sel.r=((sel.r||0)+90)%360; save(); draw(); } };
 document.getElementById('bDel').onclick=()=>{ if(sel){ S.items=S.items.filter(i=>i!==sel); sel=null; save(); showSel(); draw(); } };
 document.getElementById('bDup').onclick=()=>{ if(sel){ const c=Object.assign({},sel,{id:Date.now().toString(36), x:sel.x+0.3, y:sel.y-0.3}); S.items.push(c); sel=c; save(); showSel(); draw(); } };
@@ -345,6 +363,25 @@ function openRoom(k){ const f=S.finishes[k]; const r=GEO.ROOMS[k]; const wet = k
   const pn=document.getElementById('plasterNote'), fh=document.getElementById('fh'); const updPN=()=>{ if (pn) pn.textContent = `→ محارة من السقف لتحت: ${(3.0-(+fh.value)).toFixed(2)} م`; }; if (pn){ updPN(); fh.onchange=updPN; }
   document.getElementById('fok').onclick=()=>{ f.floor=document.getElementById('ff').value; f.paint=document.getElementById('fc').value; f.tileH=+document.getElementById('fh').value; if (document.getElementById('fwt')) f.wallTile=document.getElementById('fwt').value; f.ceilType=document.getElementById('fce').value; f.note=document.getElementById('fn').value; save(); closeSheet(); draw(); }; }
 
+
+// ===================== التنفيذ =====================
+function progPct(){ let t=0,d=0; for (const k of PROG_ROOMS) for (const [id] of STAGES){ if (k==="balcony" && ["plumb","wtile","doors","frames"].includes(id)) continue; if ((k==="corr"||k==="niche") && ["win","doors","frames"].includes(id)) continue; t+=2; d+=S.progress[k][id]; } return t?Math.round(100*d/t):0; }
+function openProg(){
+  const sym=v=>["⬜","🔶","✅"][v];
+  let rows = STAGES.map(([id,name])=>`<tr><th style="text-align:right">${name}</th>${PROG_ROOMS.map(k=>`<td style="text-align:center;cursor:pointer;font-size:16px" data-k="${k}" data-s="${id}">${sym(S.progress[k][id])}</td>`).join("")}</tr>`).join("");
+  openSheet(`<h2>حالة التنفيذ – ${progPct()}% <span style="font-size:12px;color:var(--muted);font-weight:400">اضغط الخانة: لم يبدأ ⬜ → جاري 🔶 → تم ✅</span></h2>
+  <div style="overflow:auto"><table id="ptab"><tr><th></th>${PROG_ROOMS.map(k=>`<th style="font-size:11px">${GEO.ROOMS[k].name}</th>`).join("")}</tr>${rows}</table></div>
+  <div class="row"><button class="sm" id="pAllRow">تعليم صف كامل كـ "تم": </button><select id="pRow">${STAGES.map(([id,n])=>`<option value="${id}">${n}</option>`).join("")}</select></div>
+  <p style="font-size:12px;color:var(--muted)">القيم الابتدائية مأخوذة من صور الموقع (14/11): المباني تمت، حلوق الأبواب موجودة، سباكة الحمام والغسالة جارية، تأسيس الكهرباء جاري. صحّحها بالضغط.</p>`);
+  document.querySelectorAll('#ptab td[data-k]').forEach(td=>td.onclick=()=>{ const k=td.dataset.k, id=td.dataset.s; S.progress[k][id]=(S.progress[k][id]+1)%3; td.textContent=sym(S.progress[k][id]); save(); sheet.querySelector('h2').firstChild.textContent=`حالة التنفيذ – ${progPct()}% `; if (showReality) draw(); });
+  document.getElementById('pAllRow').onclick=()=>{ const id=document.getElementById('pRow').value; for (const k of PROG_ROOMS) S.progress[k][id]=2; save(); openProg(); };
+}
+document.getElementById('bProg').onclick=openProg;
+const BRICK="#b4705c", CONC="#b9b4aa";
+function setReality(on){ showReality=on; document.getElementById('bImag').classList.toggle('on',!on); document.getElementById('bRealM').classList.toggle('on',on); document.getElementById('hint').textContent = on ? "وضع حقيقي: الشقة كما هي الآن حسب جدول التنفيذ – تظهر العناصر المعلّمة «موجود فعلًا» فقط" : (mode3d ? "اسحب للدوران · إصبعين للتقريب · التعديل من وضع 2D وبيظهر هنا فورًا" : "اختار عنصر من المكتبة ثم اضغط مكانه في المخطط · إصبعين/عجلة الماوس للتكبير · اضغط على اسم غرفة لتشطيبها · كمبيوتر: R لف · Delete حذف · Ctrl+D نسخ"); draw(); }
+document.getElementById('bImag').onclick=()=>setReality(false); document.getElementById('bRealM').onclick=()=>setReality(true);
+const visibleItems = () => showReality ? S.items.filter(i=>i.real) : S.items;
+
 // ===================== الكميات =====================
 const H = 3.00;
 function perim(b){ const [x1,y1,x2,y2]=b; return 2*((x2-x1)+(y2-y1)); }
@@ -369,7 +406,7 @@ function quantities(){
   return {rows, floors, wallTile, paint, plaster, ceil, gyps, skirting, cnt, pts, elecApp, plumbApp}; }
 document.getElementById('bQty').onclick=()=>{ const q=quantities();
   const ptName={light:"نقط إضاءة",socket:"برايز",switch:"مفاتيح",ac:"نقط تكييف",data:"تلفزيون/نت",cold:"تغذية بارد",hot:"تغذية ساخن",drain:"صرف",floor:"بلاعات",gas:"غاز"};
-  openSheet(`<h2>جدول الكميات (صافي – أضف 10% هالك)</h2>
+  openSheet(`<h2>جدول الكميات (صافي – أضف 10% هالك) <span style="font-size:12px;color:var(--muted);font-weight:400">· التنفيذ ${progPct()}%</span></h2>
   <table><tr><th>الفراغ</th><th>أرضية م²</th><th>سيراميك حوائط م²</th><th>نقاشة م²</th><th>خامة الأرضية</th></tr>${q.rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</table>
   <h2 style="margin-top:12px">الإجماليات</h2>
   <table>
@@ -414,6 +451,7 @@ function wallFaceStyle(px,py,nx,ny,kind){ // returns {lo:{col,h}|null, hi:col}
   const ext = kind==="E" ? "#d9d4ca" : kind==="I" ? "#e6e2d8" : kind==="L" ? "#bfd3e6" : kind==="P" ? "#cbbfa6" : "#6a6a66";
   if (!k || k==="manwar" || k==="balcony") return {lo:null, hi:ext};
   const f = S.finishes[k];
+  if (showReality){ const pr=S.progress[k]||{}; if (pr.plaster<2) return {lo:null, hi:BRICK}; if (WET(k) && f.tileH>0 && pr.wtile<2) return {lo:{col:"#d8d2c6", h:f.tileH}, hi: pr.paint<2 ? "#d8d2c6" : f.paint}; if (pr.paint<2 && !(WET(k)&&f.tileH>=3)) return {lo: (WET(k)&&f.tileH>0)?{col:f.wallTile||"#cfdfe6",h:f.tileH}:null, hi:"#d8d2c6"}; }
   if (kind==="L" && k==="corr") return S.finishes.corr.barTile ? {lo:{col:S.finishes.corr.wallTile||"#cfdfe6", h:9}, hi:f.paint} : {lo:null, hi:f.paint};
   if (WET(k) && f.tileH>0) return {lo:{col:f.wallTile||"#cfdfe6", h:f.tileH}, hi:f.paint};
   return {lo:null, hi:f.paint};
@@ -444,13 +482,13 @@ function draw3d(){
   const items=[]; // {faces[], d}
   const H = cut3d ? 1.20 : 3.0;
   // floors
-  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; const col = k==="manwar" ? "#9a9a9a" : F.c;
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; let col = k==="manwar" ? "#9a9a9a" : F.c; if (showReality && k!=="manwar" && (S.progress[k]||{}).floor<2) col=CONC;
     // split floors into tiles of 1m for sorting
     for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); const fs=boxFaces(x,y,fx,fy,-0.1,0,col); items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))-0.001}); } }
   // walls
   for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; if (z0>=H) continue; const zz1=Math.min(z1,H); const col = kind==="E" ? (dark?"#cfcac2":"#d9d4ca") : kind==="I" ? "#e6e2d8" : kind==="L" ? "#bfd3e6" : kind==="P" ? "#cbbfa6" : "#6a6a66"; const fs=boxFaces(x1,y1,x2,y2,z0,zz1,col,0,0,0,kind); items.push({faces:fs, d:Math.min(...fs.map(f=>f.d))}); }
   // design items
-  for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ // point marker: small post
+  for (const it of visibleItems()){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ // point marker: small post
       const fs=boxFaces(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); continue; }
     const zz0 = L.ceil ? 2.95 : z0, zz1 = L.ceil ? 3.0 : z0 + Math.max(h,0.02); if (cut3d && zz0>=H) continue;
     const fs=boxFaces(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2,zz0,Math.min(zz1,cut3d?Math.max(H,zz0+0.02):zz1),L.c,-(it.r||0),it.x,it.y); items.push({faces:fs,d:Math.min(...fs.map(f=>f.d))}); }
@@ -498,10 +536,10 @@ function drawWalk(){
   const g=ctx.createLinearGradient(0,0,0,Hh); g.addColorStop(0,"#cfdcea"); g.addColorStop(0.5,"#e8eef3"); g.addColorStop(0.5,"#b9b3a6"); g.addColorStop(1,"#a39d90"); ctx.fillStyle=g; ctx.fillRect(0,0,W,Hh);
   const faces=[];
   const dark=false;
-  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; const col = k==="manwar"?"#9a9a9a":F.c; const pc = S.finishes[k].ceil||"#efece6";
+  for (const k of ROOM_ORDER){ const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const F=FLOORS.find(x=>x.id===S.finishes[k].floor)||FLOORS[0]; let col = k==="manwar"?"#9a9a9a":F.c; let pc = S.finishes[k].ceil||"#efece6"; if (showReality && k!=="manwar"){ const pr=S.progress[k]||{}; if (pr.floor<2) col=CONC; if (pr.plaster<2) pc="#9d9890"; }
     for (let x=x1; x<x2; x+=1.0) for (let y=y1; y<y2; y+=1.0){ const fx=Math.min(x+1,x2), fy=Math.min(y+1,y2); faces.push(...facesOfBox(x,y,fx,fy,-0.1,0,col)); if (k!=="manwar"&&k!=="balcony") faces.push(...facesOfBox(x,y,fx,fy,3.0,3.08,pc)); } }
   for (const b of WALLS3D){ const [x1,y1,x2,y2,z0,z1,kind]=b; const k=roomAt((x1+x2)/2,(y1+y2)/2); const base = kind==="E"?"#d9d4ca":kind==="I"?"#e6e2d8":kind==="L"?"#bfd3e6":kind==="P"?"#cbbfa6":"#6a6a66"; faces.push(...facesOfBox(x1,y1,x2,y2,z0,z1,base,0,0,0,kind)); }
-  for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
+  for (const it of visibleItems()){ const L=LIB.find(l=>l.id===it.t); const w=it.w??L.w, d=it.d??L.d, h=it.h??L.h; const z0=L.z||0; if (L.pt){ faces.push(...facesOfBox(it.x-0.06,it.y-0.06,it.x+0.06,it.y+0.06, L.ceil?2.9:(z0||0.3), L.ceil?3.0:(z0||0.3)+0.12, L.c)); continue; }
     faces.push(...facesOfBox(it.x-w/2,it.y-d/2,it.x+w/2,it.y+d/2, L.ceil?2.95:z0, L.ceil?3.0:z0+Math.max(h,0.02), L.c, -(it.r||0), it.x, it.y)); }
   // wall paint: tint interior wall faces by room paint is complex; skip. Sort & draw
   faces.sort((a,b)=>b.dist-a.dist);
