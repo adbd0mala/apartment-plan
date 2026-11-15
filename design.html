@@ -340,8 +340,8 @@ function quantities(){
   for (const k of ROOM_ORDER){ if (k==="manwar") continue; const r=GEO.ROOMS[k]; const [x1,y1,x2,y2]=r.box; const area=(x2-x1)*(y2-y1); const f=S.finishes[k]; const F=FLOORS.find(x=>x.id===f.floor);
     floors[F.name]=(floors[F.name]||0)+area;
     if (k==="balcony"){ rows.push([r.name, area.toFixed(2), "—", "—", "—"]); continue; }
-    const op=openings(k); const P=perim(b=r.box); const walls=P*H-op.a; const tileA=Math.max(0, P*f.tileH - (f.tileH>0 ? op.a*Math.min(1,f.tileH/2.2) : 0));
-    const paintA=Math.max(0, walls-tileA); wallTile+=tileA; paint+=paintA; plaster+=walls; ceil+=area; if (f.ceilType==="gypsum") gyps+=area; if (f.tileH===0) skirting+=P-op.pr;
+    const wet = k==="bath"||k==="kitchen"||k==="niche"; const op=openings(k); const P=perim(b=r.box); const walls=P*H-op.a; const tileA=Math.max(0, P*f.tileH - (f.tileH>0 ? op.a*Math.min(1,f.tileH/2.2) : 0));
+    const paintA=Math.max(0, walls-tileA); wallTile+=tileA; paint+=paintA; plaster+= (wet ? Math.max(0, P*(H-f.tileH)) : walls); ceil+=area; if (f.ceilType==="gypsum") gyps+=area; if (f.tileH===0) skirting+=P-op.pr;
     rows.push([r.name, area.toFixed(2), tileA.toFixed(1), paintA.toFixed(1), F.name]); }
   const cnt={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); cnt[L.name]=(cnt[L.name]||0)+1; }
   const pts={}; for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt) pts[L.pt]=(pts[L.pt]||0)+1; }
@@ -355,7 +355,7 @@ document.getElementById('bQty').onclick=()=>{ const q=quantities();
   <table>
   ${Object.entries(q.floors).map(([n,a])=>`<tr><td>أرضيات – ${n}</td><td>${a.toFixed(2)} م²</td></tr>`).join("")}
   <tr><td>سيراميك حوائط</td><td>${q.wallTile.toFixed(1)} م²</td></tr>
-  <tr><td>محارة حوائط (بعد خصم الفتحات)</td><td>${q.plaster.toFixed(1)} م²</td></tr>
+  <tr><td>محارة حوائط (كاملة في الغرف الجافة – شريط فوق السيراميك في الرطبة – بدون الكمرات)</td><td>${q.plaster.toFixed(1)} م²</td></tr>
   <tr><td>محارة أسقف</td><td>${q.ceil.toFixed(1)} م²</td></tr>
   <tr><td>نقاشة حوائط</td><td>${q.paint.toFixed(1)} م²</td></tr>
   <tr><td>نقاشة أسقف</td><td>${(q.ceil-q.gyps).toFixed(1)} م²</td></tr>
