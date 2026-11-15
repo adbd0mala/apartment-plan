@@ -1,4 +1,4 @@
-const C='apt-v8';
+const C='apt-v9';
 const FILES=["./الملاحظات_المتبقية.html",'./','./index.html','./design.html','./viewer.html','./model.html','./plan.html','./walk.html','./plan.png','./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting()));});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==C).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});
