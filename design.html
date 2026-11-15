@@ -30,9 +30,12 @@
   #sel{display:none;gap:6px;padding:8px;background:var(--panel);border-top:1px solid var(--line);align-items:center;flex-wrap:wrap}
   #sel.on{display:flex}
   #sel .name{flex:1;font-size:13px;font-weight:600}
-  #joy{position:absolute;left:18px;bottom:18px;width:120px;height:120px;border-radius:50%;background:rgba(127,127,127,.18);border:1px solid var(--line);display:none;z-index:4;touch-action:none}
-  #joy i{position:absolute;left:40px;top:40px;width:40px;height:40px;border-radius:50%;background:var(--accent);opacity:.85}
-  #walkHelp{position:absolute;right:12px;bottom:18px;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;display:none;z-index:4}
+  #pad{position:absolute;left:14px;bottom:16px;display:none;flex-direction:column;align-items:center;gap:6px;z-index:4;touch-action:none}
+  #pad .mid{display:flex;gap:6px;direction:ltr}
+  #pad button{width:64px;height:56px;border-radius:14px;font-size:18px;line-height:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:rgba(255,255,255,.9);color:#1d1d1b;border:1px solid #bbb;user-select:none;-webkit-user-select:none;touch-action:none}
+  #pad button small{font-size:10px}
+  #pad button.on{background:var(--accent);color:#fff}
+  #walkHelp{position:absolute;right:12px;bottom:140px;max-width:46%;text-align:center;font-size:12px;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 10px;display:none;z-index:4}
   #sheet{position:absolute;inset:auto 0 0 0;max-height:70%;overflow:auto;background:var(--panel);border-top:1px solid var(--line);border-radius:16px 16px 0 0;padding:12px 14px 20px;display:none;z-index:5;box-shadow:0 -6px 24px #0002}
   #sheet.on{display:block}
   #sheet h2{font-size:15px;margin:0 0 8px}
@@ -64,7 +67,7 @@
     <canvas id="c"></canvas>
     <div class="hint" id="hint">اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها</div>
     <div id="sheet"></div>
-    <div id="joy"><i></i></div><div id="walkHelp">إصبع شمال: العصا للمشي · إصبع يمين: اسحب للنظر</div>
+    <div id="pad"><button data-k="f">▲<small>أمام</small></button><div class="mid"><button data-k="l">◀<small>شمال</small></button><button data-k="b">▼<small>خلف</small></button><button data-k="r">▶<small>يمين</small></button></div></div><div id="walkHelp">أمام/خلف للمشي · شمال/يمين للّف · اسحب على الشاشة للنظر</div>
   </div>
   <div id="sel">
     <span class="name" id="selName"></span>
@@ -432,8 +435,8 @@ document.getElementById('bCut3').onclick=e=>{ cut3d=!cut3d; e.target.classList.t
 const _fit = fit; fit = function(){ if (mode3d){ fit3d(); draw(); } else _fit(); };
 
 // ===================== وضع المشي (منظور أول شخص على Canvas) =====================
-let walk = false; const P = {x:3.0, y:-0.6, z:1.60, yaw:0, pitch:0}; let joyVec={x:0,y:0}, look=null, joyId=null, raf=null, keys={};
-const joy=document.getElementById('joy'), joyKnob=joy.querySelector('i'), walkHelp=document.getElementById('walkHelp');
+let walk = false; const P = {x:3.0, y:-0.6, z:1.60, yaw:0, pitch:0}; let look=null, raf=null, keys={};
+const walkHelp=document.getElementById('walkHelp');
 function roomName(x,y){ const k=roomAt(x,y); return k?GEO.ROOMS[k].name:"خارج الشقة"; }
 function camT(x,y,z){ const yw=P.yaw*Math.PI/180, pt=P.pitch*Math.PI/180; const dx=x-P.x, dy=y-P.y, dz=z-P.z; const fx=Math.sin(yw), fy=Math.cos(yw); const rx=Math.cos(yw), ry=-Math.sin(yw);
   const xc=dx*rx+dy*ry, yc=dx*fx+dy*fy; const dep=yc*Math.cos(pt)+dz*Math.sin(pt), up=-yc*Math.sin(pt)+dz*Math.cos(pt); return [xc,dep,up]; }
@@ -471,17 +474,16 @@ function blocked(x,y){ const r=0.22; for (const b of WALLS3D){ const [x1,y1,x2,y
   for (const it of S.items){ const L=LIB.find(l=>l.id===it.t); if (L.pt||L.wall||L.ceil) continue; const h=it.h??L.h; if (h<0.3) continue; const w=it.w??L.w, d=it.d??L.d; const a=((it.r||0)%180)!==0; const hw=(a?d:w)/2, hd=(a?w:d)/2; if (x>it.x-hw-r&&x<it.x+hw+r&&y>it.y-hd-r&&y<it.y+hd+r) return true; } return false; }
 let lastT=0;
 function step(t){ if (!walk) return; const dt=Math.min(0.05,(t-lastT)/1000||0.016); lastT=t;
-  let mx=joyVec.x, my=joyVec.y; if (keys["ArrowUp"]||keys["w"]) my=1; if (keys["ArrowDown"]||keys["s"]) my=-1; if (keys["a"]) mx=-1; if (keys["d"]) mx=1; if (keys["ArrowLeft"]) P.yaw-=90*dt; if (keys["ArrowRight"]) P.yaw+=90*dt;
+  let mx=0, my=0; if (padState.f||keys["ArrowUp"]||keys["w"]) my=1; if (padState.b||keys["ArrowDown"]||keys["s"]) my=-1; if (keys["a"]) mx=-1; if (keys["d"]) mx=1; if (padState.l||keys["ArrowLeft"]) P.yaw-=80*dt; if (padState.r||keys["ArrowRight"]) P.yaw+=80*dt;
   if (mx||my){ const sp=1.4*dt; const yw=P.yaw*Math.PI/180; const fx=Math.sin(yw), fy=Math.cos(yw), rx=Math.cos(yw), ry=-Math.sin(yw); const nx=P.x+(fx*my+rx*mx)*sp, ny=P.y+(fy*my+ry*mx)*sp; if (!blocked(nx,P.y)) P.x=nx; if (!blocked(P.x,ny)) P.y=ny; }
   drawWalk(); raf=requestAnimationFrame(step); }
-function setWalk(on){ walk=on; document.getElementById('bWalk').classList.toggle('on',on); joy.style.display=on?"block":"none"; walkHelp.style.display=on?"block":"none"; document.getElementById('bCut3').style.display=on?"none":""; document.getElementById('hint').style.display=on?"none":"";
+function setWalk(on){ walk=on; document.getElementById('bWalk').classList.toggle('on',on); pad.style.display=on?"flex":"none"; walkHelp.style.display=on?"block":"none"; document.getElementById('bCut3').style.display=on?"none":""; document.getElementById('hint').style.display=on?"none":"";
   if (on){ if (!roomAt(P.x,P.y)) { P.x=3.0; P.y=-0.8; P.yaw=0; P.pitch=0; } lastT=performance.now(); raf=requestAnimationFrame(step); } else { cancelAnimationFrame(raf); draw(); } }
 document.getElementById('bWalk').onclick=()=>setWalk(!walk);
-// joystick
-joy.addEventListener('pointerdown', e=>{ joy.setPointerCapture(e.pointerId); joyId=e.pointerId; e.stopPropagation(); });
-joy.addEventListener('pointermove', e=>{ if (e.pointerId!==joyId) return; const r=joy.getBoundingClientRect(); let dx=e.clientX-(r.left+60), dy=e.clientY-(r.top+60); const m=Math.hypot(dx,dy); if (m>45){dx*=45/m; dy*=45/m;} joyKnob.style.left=(40+dx)+"px"; joyKnob.style.top=(40+dy)+"px"; joyVec={x:dx/45, y:-dy/45}; });
-const joyEnd=e=>{ if (e.pointerId!==joyId) return; joyId=null; joyVec={x:0,y:0}; joyKnob.style.left="40px"; joyKnob.style.top="40px"; };
-joy.addEventListener('pointerup', joyEnd); joy.addEventListener('pointercancel', joyEnd);
+// أزرار الاتجاهات
+const pad=document.getElementById('pad'); const padState={f:false,b:false,l:false,r:false};
+pad.querySelectorAll('button').forEach(btn=>{ const k=btn.dataset.k; const on=e=>{ e.preventDefault(); btn.setPointerCapture(e.pointerId); padState[k]=true; btn.classList.add('on'); }; const off=e=>{ padState[k]=false; btn.classList.remove('on'); };
+  btn.addEventListener('pointerdown', on); btn.addEventListener('pointerup', off); btn.addEventListener('pointercancel', off); btn.addEventListener('lostpointercapture', off); btn.addEventListener('contextmenu', e=>e.preventDefault()); });
 // look (drag on canvas while walking) – registered in capture phase before the 3D orbit handler
 stage.addEventListener('pointerdown', e=>{ if (!walk || e.target!==cv) return; e.stopImmediatePropagation(); cv.setPointerCapture(e.pointerId); look={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:P.yaw,pitch:P.pitch}; }, true);
 stage.addEventListener('pointermove', e=>{ if (!walk || !look || e.pointerId!==look.id) return; e.stopImmediatePropagation(); P.yaw = look.yaw + (e.clientX-look.x)*0.35; P.pitch = Math.max(-60, Math.min(60, look.pitch + (e.clientY-look.y)*0.25)); }, true);
