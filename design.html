@@ -12,6 +12,7 @@
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,"Segoe UI",Tahoma,Arial,sans-serif;overflow:hidden;overscroll-behavior:none}
   #app{display:flex;flex-direction:column;height:100%}
+  header{order:1} .tabs{order:2} #stage{order:3} #sel{order:4} #lib{order:5}
   header{display:flex;align-items:center;gap:5px;padding:6px 8px;flex-wrap:nowrap;overflow-x:auto;background:var(--panel);border-bottom:1px solid var(--line)}
   header h1{font-size:15px;margin:0;flex:1;white-space:nowrap;min-width:70px}
   .tabs{display:flex;gap:4px;padding:6px 8px;min-height:48px;align-items:center;overflow-y:hidden;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;white-space:nowrap}
@@ -51,6 +52,20 @@
   .swatches{display:flex;gap:6px;flex-wrap:wrap}
   .sw{width:34px;height:34px;border-radius:8px;border:2px solid transparent;cursor:pointer}
   .sw.on{border-color:var(--accent)}
+
+  /* ===== شاشات الكمبيوتر ===== */
+  @media (min-width: 900px){
+    #app{display:grid;grid-template-columns:1fr 330px;grid-template-rows:auto 1fr auto;grid-template-areas:"head head" "stage side" "sel side"}
+    header{grid-area:head}
+    #stage{grid-area:stage}
+    #sel{grid-area:sel}
+    #side{grid-area:side;display:flex !important;flex-direction:column;min-height:0;border-inline-end:1px solid var(--line);background:var(--panel)}
+    #side .tabs{flex-wrap:wrap;white-space:normal;overflow:visible;min-height:0;padding:10px;border:none}
+    #side #lib{flex:1;min-height:0;overflow-y:auto;flex-wrap:wrap;white-space:normal;align-content:flex-start;padding:4px 10px 10px;border:none}
+    #side .item{width:calc(50% - 3px);min-width:0}
+    #sheet{inset:0 auto 0 0;max-height:none;width:min(460px,50%);border-radius:0 16px 16px 0;border-top:none;border-inline-end:1px solid var(--line)}
+    #walkHelp{bottom:18px;right:12px;max-width:none}
+  }
 </style>
 </head>
 <body>
@@ -62,10 +77,10 @@
     <button class="sm" id="bQty">الكميات</button>
     <button class="sm" id="bSave">حفظ / تصدير</button>
   </header>
-  <div class="tabs" id="tabs"></div>
+  <div id="side" style="display:contents"><div class="tabs" id="tabs"></div><div id="lib"></div></div>
   <div id="stage">
     <canvas id="c"></canvas>
-    <div class="hint" id="hint">اختار عنصر من تحت ثم اضغط مكانه في المخطط · إصبعين للتكبير والسحب · اضغط على اسم غرفة لتشطيبها</div>
+    <div class="hint" id="hint">اختار عنصر من المكتبة ثم اضغط مكانه في المخطط · إصبعين/عجلة الماوس للتكبير · اضغط على اسم غرفة لتشطيبها · كمبيوتر: R لف · Delete حذف · Ctrl+D نسخ</div>
     <div id="sheet"></div>
     <div id="pad"><button data-k="f">▲<small>أمام</small></button><div class="mid"><button data-k="l">◀<small>شمال</small></button><button data-k="b">▼<small>خلف</small></button><button data-k="r">▶<small>يمين</small></button></div></div><div id="walkHelp">أمام/خلف للمشي · شمال/يمين للّف · اسحب على الشاشة للنظر</div>
   </div>
@@ -77,7 +92,6 @@
     <button class="sm warn" id="bDel">حذف</button>
     <button class="sm" id="bClose">✕</button>
   </div>
-  <div id="lib"></div>
 </div>
 
 <script>
@@ -514,7 +528,8 @@ pad.querySelectorAll('button').forEach(btn=>{ const k=btn.dataset.k; const on=e=
 stage.addEventListener('pointerdown', e=>{ if (!walk || e.target!==cv) return; e.stopImmediatePropagation(); cv.setPointerCapture(e.pointerId); look={id:e.pointerId,x:e.clientX,y:e.clientY,yaw:P.yaw,pitch:P.pitch}; }, true);
 stage.addEventListener('pointermove', e=>{ if (!walk || !look || e.pointerId!==look.id) return; e.stopImmediatePropagation(); P.yaw = look.yaw + (e.clientX-look.x)*0.35; P.pitch = Math.max(-60, Math.min(60, look.pitch + (e.clientY-look.y)*0.25)); }, true);
 const lookEnd=e=>{ if (!walk) return; e.stopImmediatePropagation(); if (look && e.pointerId===look.id) look=null; }; stage.addEventListener('pointerup', lookEnd, true); stage.addEventListener('pointercancel', lookEnd, true);
-addEventListener('keydown', e=>{ keys[e.key]=true; if (walk && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault(); }); addEventListener('keyup', e=>{ keys[e.key]=false; });
+addEventListener('keydown', e=>{ if (!mode3d && !e.target.matches('input,textarea,select')){ if (e.key==='Delete'||e.key==='Backspace'){ if (sel){ document.getElementById('bDel').click(); e.preventDefault(); } } else if (e.key==='r'||e.key==='R'){ document.getElementById('bRot').click(); } else if (e.key==='Escape'){ document.getElementById('bClose').click(); closeSheet(); } else if ((e.ctrlKey||e.metaKey) && (e.key==='d'||e.key==='D')){ document.getElementById('bDup').click(); e.preventDefault(); } }
+  keys[e.key]=true; if (walk && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault(); }); addEventListener('keyup', e=>{ keys[e.key]=false; });
 
 // 3D interaction: override pointer handlers when in 3D
 let rot = null;
@@ -529,7 +544,7 @@ stage.addEventListener('pointerup', up3, true); stage.addEventListener('pointerc
 stage.addEventListener('wheel', e => { if (!mode3d) return; e.stopImmediatePropagation(); e.preventDefault(); const k=e.deltaY<0?1.1:1/1.1; const r=cv.getBoundingClientRect(); const px=e.clientX-r.left, py=e.clientY-r.top; cam.ox = px-(px-cam.ox)*k; cam.oy = py-(py-cam.oy)*k; cam.s*=k; draw(); }, {passive:false, capture:true});
 
 document.getElementById('bFit').onclick=()=>fit();
-fit();
+fit(); requestAnimationFrame(()=>fit()); addEventListener('load', ()=>fit());
 </script>
 <script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body>
