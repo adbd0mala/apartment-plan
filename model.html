@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>مجسم الشقة</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1f4e79"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
 <style>
   :root{--bg:#f4f2ee;--fg:#1d1d1b;--muted:#6b6b66;--panel:rgba(255,255,255,.92);--line:#d9d6cf;--accent:#1f4e79}
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--panel:rgba(32,32,31,.92);--line:#3a3a38;--accent:#7fb2e6}}
@@ -66,5 +67,6 @@
   document.getElementById('bSpin').onclick = e => { mv.autoRotate = !mv.autoRotate; e.target.classList.toggle('on', mv.autoRotate); };
   mv.addEventListener('camera-change', e => { if (e.detail.source === 'user-interaction') for (const k in views) document.getElementById(k).classList.remove('on'); });
 </script>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body>
 </html>

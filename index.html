@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>مخطط الشقة</title>
+<link rel="manifest" href="manifest.json"><meta name="theme-color" content="#1f4e79"><link rel="icon" href="icon-192.png"><link rel="apple-touch-icon" href="icon-192.png"><meta name="apple-mobile-web-app-capable" content="yes">
 <style>
 :root{--bg:#f4f2ee;--fg:#1d1d1b;--muted:#6b6b66;--line:#d9d6cf;--card:#fff;--accent:#1f4e79}
 @media (prefers-color-scheme: dark){:root{--bg:#1b1b1a;--fg:#ececea;--muted:#a3a39d;--line:#3a3a38;--card:#242423;--accent:#7fb2e6}}
@@ -21,5 +22,7 @@ a.card b{display:block;font-size:17px;color:var(--accent);margin-bottom:4px}a.ca
 <a class="card" href="plan.dxf"><b>ملف DXF للأوتوكاد</b><span>طبقات منفصلة: حوائط / أعمدة / أبواب / شبابيك / أبعاد</span></a>
 <a class="card" href="model.glb"><b>الموديل GLB</b><span>يفتح في أي عارض 3D أو Google Drive</span></a>
 <a class="card" href="apartment_3d.obj"><b>الموديل OBJ</b><span>لـ SketchUp / Blender / 3ds Max</span></a>
+<p id="install-hint" style="margin-top:20px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;color:var(--fg)">📲 <b>سطّبه كتطبيق:</b> في كروم اضغط القائمة ⋮ ثم «إضافة إلى الشاشة الرئيسية» (أو «تثبيت التطبيق»). هيشتغل بعدها من الأيقونة وبدون إنترنت.</p>
 <p style="margin-top:20px">النسخة: v2.3 (14/11/2026) – حائط المطبخ الأيمن بار 1.50 مع إبقاء باب المطبخ. المصدر: <a href="https://github.com/adbd0mala/apartment-plan">github.com/adbd0mala/apartment-plan</a></p>
+<script>if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});</script>
 </body></html>
